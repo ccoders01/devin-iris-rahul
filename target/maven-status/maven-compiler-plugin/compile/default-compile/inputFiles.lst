@@ -1,0 +1,15 @@
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/presentation/controller/CustomerController.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/application/service/CustomerService.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/presentation/controller/DashboardController.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/infrastructure/persistence/FacilityRepository.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/infrastructure/persistence/ContractRepository.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/application/service/ContractService.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/domain/customer/Customer.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/presentation/controller/ContractController.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/FacilityManagementApplication.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/presentation/controller/FacilityController.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/application/service/FacilityService.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/infrastructure/DataInitializer.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/infrastructure/persistence/CustomerRepository.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/domain/contract/Contract.java
+/home/ubuntu/repos/facility-management-system/src/main/java/com/facility/management/domain/facility/Facility.java
