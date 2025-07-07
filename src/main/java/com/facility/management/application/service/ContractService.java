@@ -2,6 +2,8 @@ package com.facility.management.application.service;
 
 import com.facility.management.domain.contract.Contract;
 import com.facility.management.infrastructure.persistence.ContractRepository;
+import com.facility.management.infrastructure.persistence.FacilityRepository;
+import com.facility.management.infrastructure.persistence.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,8 @@ import java.util.Optional;
 public class ContractService {
     
     private final ContractRepository contractRepository;
+    private final FacilityRepository facilityRepository;
+    private final CustomerRepository customerRepository;
     
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
@@ -29,6 +33,12 @@ public class ContractService {
     }
     
     public Contract createContract(Contract contract) {
+        if (facilityRepository.findByGfrn(contract.getGfrn()).isEmpty()) {
+            throw new RuntimeException("Facility with GFRN " + contract.getGfrn() + " not found");
+        }
+        if (customerRepository.findByGfcid(contract.getGfcid()).isEmpty()) {
+            throw new RuntimeException("Customer with GFCID " + contract.getGfcid() + " not found");
+        }
         return contractRepository.save(contract);
     }
     
@@ -56,5 +66,9 @@ public class ContractService {
     
     public List<Contract> getContractsByAccountingPeriod(String accountingPeriod) {
         return contractRepository.findByAccountingPeriod(accountingPeriod);
+    }
+    
+    public List<Contract> getAllContractsWithRelations() {
+        return contractRepository.findAllWithRelations();
     }
 }

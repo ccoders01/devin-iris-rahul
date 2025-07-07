@@ -1,5 +1,8 @@
 package com.facility.management.domain.contract;
 
+import com.facility.management.domain.facility.Facility;
+import com.facility.management.domain.customer.Customer;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -30,6 +33,16 @@ public class Contract {
     
     @NotBlank(message = "GFCID is required")
     private String gfcid;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gfrn", referencedColumnName = "gfrn", insertable = false, updatable = false)
+    @JsonIgnore
+    private Facility facility;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gfcid", referencedColumnName = "gfcid", insertable = false, updatable = false)
+    @JsonIgnore
+    private Customer customer;
     
     @NotNull(message = "Direct amount is required")
     @DecimalMin(value = "0.0", message = "Direct amount must be positive")

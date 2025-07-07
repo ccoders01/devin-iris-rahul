@@ -93,7 +93,7 @@ public class DashboardController {
     
     @GetMapping("/contracts")
     public String contracts(Model model) {
-        model.addAttribute("contracts", contractService.getAllContracts());
+        model.addAttribute("contracts", contractService.getAllContractsWithRelations());
         model.addAttribute("contract", new Contract());
         return "contracts";
     }

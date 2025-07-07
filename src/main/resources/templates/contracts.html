@@ -98,7 +98,9 @@
                                         <th>ID</th>
                                         <th>Transaction ID</th>
                                         <th>GFRN</th>
+                                        <th>Facility Name</th>
                                         <th>GFCID</th>
+                                        <th>Customer CAG ID</th>
                                         <th>Direct Amount</th>
                                         <th>Contingent Amount</th>
                                         <th>Accounting Period</th>
@@ -110,7 +112,9 @@
                                         <td th:text="${contract.id}"></td>
                                         <td th:text="${contract.transactionId}"></td>
                                         <td th:text="${contract.gfrn}"></td>
+                                        <td th:text="${contract.facility != null ? contract.facility.name : 'N/A'}"></td>
                                         <td th:text="${contract.gfcid}"></td>
+                                        <td th:text="${contract.customer != null ? contract.customer.cagId : 'N/A'}"></td>
                                         <td th:text="${'$' + #numbers.formatDecimal(contract.directAmount, 0, 2)}"></td>
                                         <td th:text="${'$' + #numbers.formatDecimal(contract.contingentAmount, 0, 2)}"></td>
                                         <td th:text="${contract.accountingPeriod}"></td>

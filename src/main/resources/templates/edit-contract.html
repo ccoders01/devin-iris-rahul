@@ -95,10 +95,12 @@
                                     <div class="mb-3">
                                         <label for="gfrn" class="form-label">GFRN</label>
                                         <input type="text" class="form-control" id="gfrn" th:field="*{gfrn}" required>
+                                        <div class="form-text" th:if="${contract.facility != null}" th:text="'Current Facility: ' + ${contract.facility.name}"></div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="gfcid" class="form-label">GFCID</label>
                                         <input type="text" class="form-control" id="gfcid" th:field="*{gfcid}" required>
+                                        <div class="form-text" th:if="${contract.customer != null}" th:text="'Current Customer: ' + ${contract.customer.cagId}"></div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="directAmount" class="form-label">Direct Amount</label>
