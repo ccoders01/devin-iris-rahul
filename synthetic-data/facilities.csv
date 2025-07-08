@@ -1,0 +1,21 @@
+GFRN,AccountingPeriod,Name,GFCID,CountryOfRisk
+GFRN001,2024-Q1,Main Manufacturing Facility,GFCID001,USA
+GFRN002,2024-Q1,European Manufacturing Hub,GFCID002,Germany
+GFRN003,2024-Q2,Asia Pacific Manufacturing,GFCID003,Singapore
+GFRN004,2024-Q2,North American Distribution,GFCID004,Canada
+GFRN005,2024-Q3,Latin America Distribution,GFCID005,Brazil
+GFRN006,2024-Q3,European Distribution Center,GFCID006,Germany
+GFRN007,2024-Q4,Research & Development Center,GFCID007,USA
+GFRN008,2024-Q4,Innovation Lab Europe,GFCID008,UK
+GFRN009,2023-Q4,Advanced Research Facility,GFCID009,Japan
+GFRN010,2023-Q3,Global Operations Center,GFCID010,Singapore
+GFRN011,2023-Q2,Regional Operations Hub,GFCID011,Australia
+GFRN012,2023-Q1,Customer Service Center,GFCID012,India
+GFRN013,2024-Q1,Corporate Headquarters,GFCID013,USA
+GFRN014,2024-Q2,Regional Office Europe,GFCID014,France
+GFRN015,2024-Q3,Regional Office LATAM,GFCID015,Mexico
+GFRN016,2024-Q4,Technology Innovation Hub,GFCID016,Canada
+GFRN017,2023-Q4,Quality Assurance Center,GFCID017,Germany
+GFRN018,2023-Q3,Supply Chain Operations,GFCID018,Singapore
+GFRN019,2023-Q2,Customer Experience Center,GFCID019,Australia
+GFRN020,2023-Q1,Strategic Planning Office,GFCID020,UK
