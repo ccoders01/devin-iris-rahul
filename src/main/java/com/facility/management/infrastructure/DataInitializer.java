@@ -49,7 +49,7 @@ public class DataInitializer implements CommandLineRunner {
         Customer customer3 = new Customer("CAG003", "GFCID003", "2024-Q2", "Singapore");
         Customer customer4 = new Customer("CAG004", "GFCID004", "2024-Q2", "Canada");
         Customer customer5 = new Customer("CAG005", "GFCID005", "2024-Q3", "Brazil");
-        Customer customer6 = new Customer("CAG006", "GFCID001", "2024-Q3", "Mexico");
+        Customer customer6 = new Customer("CAG006", "GFCID006", "2024-Q3", "Mexico");
         
         customerRepository.save(customer1);
         customerRepository.save(customer2);
@@ -68,7 +68,7 @@ public class DataInitializer implements CommandLineRunner {
                 new BigDecimal("800000.00"), new BigDecimal("400000.00"), "2024-Q2");
         Contract contract5 = new Contract("TXN005", "GFRN005", "GFCID005", 
                 new BigDecimal("950000.00"), new BigDecimal("475000.00"), "2024-Q3");
-        Contract contract6 = new Contract("TXN006", "GFRN001", "GFCID001", 
+        Contract contract6 = new Contract("TXN006", "GFRN001", "GFCID006", 
                 new BigDecimal("1100000.00"), new BigDecimal("550000.00"), "2024-Q3");
         
         contractRepository.save(contract1);
