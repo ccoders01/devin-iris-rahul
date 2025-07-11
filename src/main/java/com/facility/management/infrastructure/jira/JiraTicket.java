@@ -2,6 +2,8 @@ package com.facility.management.infrastructure.jira;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JiraTicket {
@@ -12,6 +14,7 @@ public class JiraTicket {
     
     public static class Fields {
         private String summary;
+        @JsonDeserialize(using = DescriptionDeserializer.class)
         private String description;
         private IssueType issuetype;
         private Status status;
@@ -132,5 +135,40 @@ public class JiraTicket {
                lowerText.contains("cag") ||
                lowerText.contains("accounting period") ||
                lowerText.contains("country of risk");
+    }
+    
+    public static class DescriptionDeserializer extends com.fasterxml.jackson.databind.JsonDeserializer<String> {
+        @Override
+        public String deserialize(com.fasterxml.jackson.core.JsonParser p, 
+                                com.fasterxml.jackson.databind.DeserializationContext ctxt) 
+                throws java.io.IOException {
+            JsonNode node = p.getCodec().readTree(p);
+            
+            if (node.isTextual()) {
+                return node.asText();
+            }
+            
+            if (node.isObject() && node.has("content")) {
+                return extractTextFromContent(node.get("content"));
+            }
+            
+            return node.toString();
+        }
+        
+        private String extractTextFromContent(JsonNode contentArray) {
+            StringBuilder text = new StringBuilder();
+            
+            if (contentArray.isArray()) {
+                for (JsonNode item : contentArray) {
+                    if (item.has("content")) {
+                        text.append(extractTextFromContent(item.get("content")));
+                    } else if (item.has("text")) {
+                        text.append(item.get("text").asText()).append(" ");
+                    }
+                }
+            }
+            
+            return text.toString().trim();
+        }
     }
 }
