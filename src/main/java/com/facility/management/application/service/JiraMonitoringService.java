@@ -63,6 +63,12 @@ public class JiraMonitoringService {
             
             processedTickets.add(ticket.getKey());
             
+            jiraClient.updateTicketStatus(ticket.getKey(), "21")
+                    .subscribe(
+                            v -> logger.info("Transitioned ticket {} to In Progress", ticket.getKey()),
+                            error -> logger.warn("Could not transition ticket {} to In Progress: {}", ticket.getKey(), error.getMessage())
+                    );
+            
             jiraClient.addComment(ticket.getKey(), "🤖 AI Agent: Ticket received and being processed...")
                     .subscribe(
                             v -> logger.info("Added processing comment to ticket {}", ticket.getKey()),
@@ -74,14 +80,27 @@ public class JiraMonitoringService {
                             result -> {
                                 logger.info("AI processing completed for ticket {}: {}", ticket.getKey(), result.isSuccess());
                                 
-                                String comment = result.isSuccess() 
-                                        ? "✅ AI Agent: Successfully processed and implemented changes. " + result.getMessage()
-                                        : "❌ AI Agent: Processing failed. " + result.getMessage();
+                                String comment;
+                                String transitionId;
+                                
+                                if (result.isSuccess()) {
+                                    comment = "✅ AI Agent: Successfully processed and implemented changes. " + result.getMessage();
+                                    transitionId = "31";
+                                } else {
+                                    comment = "❌ AI Agent: Processing failed. " + result.getMessage();
+                                    transitionId = "41";
+                                }
                                 
                                 jiraClient.addComment(ticket.getKey(), comment)
                                         .subscribe(
                                                 v -> logger.info("Added result comment to ticket {}", ticket.getKey()),
                                                 error -> logger.error("Error adding result comment to ticket {}", ticket.getKey(), error)
+                                        );
+                                
+                                jiraClient.updateTicketStatus(ticket.getKey(), transitionId)
+                                        .subscribe(
+                                                v -> logger.info("Transitioned ticket {} to final status", ticket.getKey()),
+                                                error -> logger.warn("Could not transition ticket {} to final status: {}", ticket.getKey(), error.getMessage())
                                         );
                             },
                             error -> {
@@ -89,6 +108,12 @@ public class JiraMonitoringService {
                                 
                                 jiraClient.addComment(ticket.getKey(), "❌ AI Agent: Processing error occurred. " + error.getMessage())
                                         .subscribe();
+                                
+                                jiraClient.updateTicketStatus(ticket.getKey(), "41")
+                                        .subscribe(
+                                                v -> logger.info("Transitioned ticket {} to failed status", ticket.getKey()),
+                                                error2 -> logger.warn("Could not transition ticket {} to failed status: {}", ticket.getKey(), error2.getMessage())
+                                        );
                             }
                     );
             
@@ -100,5 +125,13 @@ public class JiraMonitoringService {
     public void resetProcessedTickets() {
         processedTickets.clear();
         logger.info("Reset processed tickets cache");
+    }
+    
+    public int getProcessedTicketsCount() {
+        return processedTickets.size();
+    }
+    
+    public Set<String> getProcessedTickets() {
+        return new HashSet<>(processedTickets);
     }
 }

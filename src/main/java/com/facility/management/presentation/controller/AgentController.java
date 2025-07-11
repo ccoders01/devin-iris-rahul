@@ -24,6 +24,8 @@ public class AgentController {
             "status", "running",
             "monitoring", "active",
             "lastCheck", System.currentTimeMillis(),
+            "processedTicketsCount", jiraMonitoringService.getProcessedTicketsCount(),
+            "processedTickets", jiraMonitoringService.getProcessedTickets(),
             "description", "AI Agent monitoring JIRA for facility management tickets"
         );
         return ResponseEntity.ok(status);

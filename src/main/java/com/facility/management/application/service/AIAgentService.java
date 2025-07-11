@@ -193,8 +193,20 @@ public class AIAgentService {
     private ProcessingResult handleCreateContract(RequirementAnalysis analysis) {
         try {
             String transactionId = analysis.getTransactionId() != null ? analysis.getTransactionId() : "AUTO-TXN-" + System.currentTimeMillis();
-            String gfrn = analysis.getGfrn() != null ? analysis.getGfrn() : "AUTO-GFRN";
-            String gfcid = analysis.getGfcid() != null ? analysis.getGfcid() : "AUTO-GFCID";
+            String gfrn = analysis.getGfrn();
+            String gfcid = analysis.getGfcid();
+            
+            if (gfrn == null || gfrn.trim().isEmpty()) {
+                return new ProcessingResult(false, "GFRN is required for contract creation. Please specify a valid facility GFRN.");
+            }
+            if (gfcid == null || gfcid.trim().isEmpty()) {
+                gfcid = "AUTO-GFCID";
+            }
+            
+            if (facilityService.getFacilityByGfrn(gfrn).isEmpty()) {
+                return new ProcessingResult(false, "Facility with GFRN '" + gfrn + "' not found. Please create the facility first or use an existing GFRN.");
+            }
+            
             BigDecimal directAmount = analysis.getDirectAmount() != null ? analysis.getDirectAmount() : BigDecimal.ZERO;
             BigDecimal contingentAmount = analysis.getContingentAmount() != null ? analysis.getContingentAmount() : BigDecimal.ZERO;
             String accountingPeriod = analysis.getAccountingPeriod() != null ? analysis.getAccountingPeriod() : "2024";

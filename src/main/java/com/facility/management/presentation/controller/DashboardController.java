@@ -3,6 +3,7 @@ package com.facility.management.presentation.controller;
 import com.facility.management.application.service.ContractService;
 import com.facility.management.application.service.CustomerService;
 import com.facility.management.application.service.FacilityService;
+import com.facility.management.application.service.JiraMonitoringService;
 import com.facility.management.domain.contract.Contract;
 import com.facility.management.domain.customer.Customer;
 import com.facility.management.domain.facility.Facility;
@@ -20,6 +21,7 @@ public class DashboardController {
     private final FacilityService facilityService;
     private final CustomerService customerService;
     private final ContractService contractService;
+    private final JiraMonitoringService jiraMonitoringService;
     
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -120,5 +122,12 @@ public class DashboardController {
     public String deleteContract(@PathVariable Long id) {
         contractService.deleteContract(id);
         return "redirect:/contracts";
+    }
+    
+    @GetMapping("/agent")
+    public String agentMonitoring(Model model) {
+        model.addAttribute("processedTicketsCount", jiraMonitoringService.getProcessedTicketsCount());
+        model.addAttribute("processedTickets", jiraMonitoringService.getProcessedTickets());
+        return "agent-monitoring";
     }
 }

@@ -3,6 +3,10 @@ jira:
   base-url: ${JIRA_BASE_URL:https://your-domain.atlassian.net}
   username: ${JIRA_USERNAME:}
   api-token: ${JIRA_API_TOKEN:}
+  transitions:
+    in-progress: "21"
+    done: "31"
+    failed: "41"
 
 ai:
   provider: ${AI_PROVIDER:mock}
