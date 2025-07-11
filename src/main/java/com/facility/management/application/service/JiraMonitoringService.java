@@ -81,14 +81,18 @@ public class JiraMonitoringService {
                                 logger.info("AI processing completed for ticket {}: {}", ticket.getKey(), result.isSuccess());
                                 
                                 String comment;
-                                String transitionId;
+                                String transitionId = null;
                                 
                                 if (result.isSuccess()) {
                                     comment = "✅ AI Agent: Successfully processed and implemented changes. " + result.getMessage();
                                     transitionId = "31";
                                 } else {
                                     comment = "❌ AI Agent: Processing failed. " + result.getMessage();
-                                    transitionId = "41";
+                                    if (result.getMessage().contains("required") || result.getMessage().contains("not found")) {
+                                        comment += " Please update the ticket with the required information and the agent will retry.";
+                                    } else {
+                                        transitionId = "41";
+                                    }
                                 }
                                 
                                 jiraClient.addComment(ticket.getKey(), comment)
@@ -97,21 +101,26 @@ public class JiraMonitoringService {
                                                 error -> logger.error("Error adding result comment to ticket {}", ticket.getKey(), error)
                                         );
                                 
-                                jiraClient.updateTicketStatus(ticket.getKey(), transitionId)
-                                        .subscribe(
-                                                v -> logger.info("Transitioned ticket {} to final status", ticket.getKey()),
-                                                error -> logger.warn("Could not transition ticket {} to final status: {}", ticket.getKey(), error.getMessage())
-                                        );
+                                if (transitionId != null) {
+                                    jiraClient.updateTicketStatus(ticket.getKey(), transitionId)
+                                            .subscribe(
+                                                    v -> logger.info("Transitioned ticket {} to final status", ticket.getKey()),
+                                                    error -> logger.warn("Could not transition ticket {} to final status: {}", ticket.getKey(), error.getMessage())
+                                            );
+                                } else {
+                                    logger.info("Keeping ticket {} in In Progress status for user to address validation issues", ticket.getKey());
+                                }
                             },
                             error -> {
                                 logger.error("Error processing ticket {} with AI agent", ticket.getKey(), error);
                                 
-                                jiraClient.addComment(ticket.getKey(), "❌ AI Agent: Processing error occurred. " + error.getMessage())
+                                String errorComment = "❌ AI Agent: Processing error occurred. " + error.getMessage();
+                                jiraClient.addComment(ticket.getKey(), errorComment)
                                         .subscribe();
                                 
                                 jiraClient.updateTicketStatus(ticket.getKey(), "41")
                                         .subscribe(
-                                                v -> logger.info("Transitioned ticket {} to failed status", ticket.getKey()),
+                                                v -> logger.info("Transitioned ticket {} to failed status due to processing error", ticket.getKey()),
                                                 error2 -> logger.warn("Could not transition ticket {} to failed status: {}", ticket.getKey(), error2.getMessage())
                                         );
                             }
