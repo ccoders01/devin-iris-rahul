@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = ["Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = {extras = ["standard"], version = "^0.116.0"}
+psycopg = {extras = ["binary"], version = "^3.2.9"}
+pydantic = "^2.11.7"
+python-multipart = "^0.0.20"
+numpy = "^2.3.1"
+pandas = "^2.3.1"
+scikit-learn = "^1.7.0"
+matplotlib = "^3.10.3"
+seaborn = "^0.13.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
