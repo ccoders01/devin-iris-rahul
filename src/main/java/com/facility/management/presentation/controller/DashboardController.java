@@ -4,6 +4,7 @@ import com.facility.management.application.service.ContractService;
 import com.facility.management.application.service.CustomerService;
 import com.facility.management.application.service.FacilityService;
 import com.facility.management.application.service.JiraMonitoringService;
+import com.facility.management.application.service.SeleniumTestAgent;
 import com.facility.management.domain.contract.Contract;
 import com.facility.management.domain.customer.Customer;
 import com.facility.management.domain.facility.Facility;
@@ -22,6 +23,7 @@ public class DashboardController {
     private final CustomerService customerService;
     private final ContractService contractService;
     private final JiraMonitoringService jiraMonitoringService;
+    private final SeleniumTestAgent seleniumTestAgent;
     
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -128,6 +130,8 @@ public class DashboardController {
     public String agentMonitoring(Model model) {
         model.addAttribute("processedTicketsCount", jiraMonitoringService.getProcessedTicketsCount());
         model.addAttribute("processedTickets", jiraMonitoringService.getProcessedTickets());
+        model.addAttribute("testProcessedTicketsCount", seleniumTestAgent.getProcessedTestTicketsCount());
+        model.addAttribute("testProcessedTickets", seleniumTestAgent.getProcessedTestTickets());
         return "agent-monitoring";
     }
 }

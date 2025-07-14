@@ -1,6 +1,7 @@
 package com.facility.management.presentation.controller;
 
 import com.facility.management.application.service.JiraMonitoringService;
+import com.facility.management.application.service.SeleniumTestAgent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,10 +13,12 @@ import java.util.Map;
 public class AgentController {
     
     private final JiraMonitoringService jiraMonitoringService;
+    private final SeleniumTestAgent seleniumTestAgent;
     
     @Autowired
-    public AgentController(JiraMonitoringService jiraMonitoringService) {
+    public AgentController(JiraMonitoringService jiraMonitoringService, SeleniumTestAgent seleniumTestAgent) {
         this.jiraMonitoringService = jiraMonitoringService;
+        this.seleniumTestAgent = seleniumTestAgent;
     }
     
     @GetMapping("/status")
@@ -26,7 +29,9 @@ public class AgentController {
             "lastCheck", System.currentTimeMillis(),
             "processedTicketsCount", jiraMonitoringService.getProcessedTicketsCount(),
             "processedTickets", jiraMonitoringService.getProcessedTickets(),
-            "description", "AI Agent monitoring JIRA for facility management tickets"
+            "testAgentProcessedCount", seleniumTestAgent.getProcessedTestTicketsCount(),
+            "testAgentProcessedTickets", seleniumTestAgent.getProcessedTestTickets(),
+            "description", "AI Agents monitoring JIRA for facility management and test generation"
         );
         return ResponseEntity.ok(status);
     }
@@ -40,6 +45,13 @@ public class AgentController {
     @PostMapping("/reset-cache")
     public ResponseEntity<Map<String, String>> resetCache() {
         jiraMonitoringService.resetProcessedTickets();
-        return ResponseEntity.ok(Map.of("message", "Processed tickets cache reset successfully"));
+        seleniumTestAgent.resetProcessedTestTickets();
+        return ResponseEntity.ok(Map.of("message", "Processed tickets cache reset successfully for both agents"));
+    }
+    
+    @PostMapping("/trigger-test-generation")
+    public ResponseEntity<Map<String, String>> triggerTestGeneration() {
+        seleniumTestAgent.monitorJiraForTestGeneration();
+        return ResponseEntity.ok(Map.of("message", "Selenium test generation triggered successfully"));
     }
 }
