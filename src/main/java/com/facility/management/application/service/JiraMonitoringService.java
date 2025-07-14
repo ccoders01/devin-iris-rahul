@@ -20,12 +20,14 @@ public class JiraMonitoringService {
     
     private final JiraClient jiraClient;
     private final AIAgentService aiAgentService;
+    private final LLMService llmService;
     private final Set<String> processedTickets = new HashSet<>();
     
     @Autowired
-    public JiraMonitoringService(JiraClient jiraClient, AIAgentService aiAgentService) {
+    public JiraMonitoringService(JiraClient jiraClient, AIAgentService aiAgentService, LLMService llmService) {
         this.jiraClient = jiraClient;
         this.aiAgentService = aiAgentService;
+        this.llmService = llmService;
     }
     
     @Scheduled(fixedRate = 300000)
@@ -69,10 +71,28 @@ public class JiraMonitoringService {
                             error -> logger.warn("Could not transition ticket {} to In Progress: {}", ticket.getKey(), error.getMessage())
                     );
             
-            jiraClient.addComment(ticket.getKey(), "🤖 AI Agent: Ticket received and being processed...")
+            String summary = ticket.getFields().getSummary();
+            String description = ticket.getFields().getDescription();
+            
+            String requirementAnalysis = llmService.analyzeRequirements(summary, description);
+            String impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
+            
+            String analysisComment = String.format("""
+                🤖 **AI Analysis**
+                
+                **Requirement Analysis:**
+                %s
+                
+                **Impact Analysis:**
+                %s
+                
+                Processing implementation...
+                """, requirementAnalysis, impactAnalysis);
+            
+            jiraClient.addComment(ticket.getKey(), analysisComment)
                     .subscribe(
-                            v -> logger.info("Added processing comment to ticket {}", ticket.getKey()),
-                            error -> logger.error("Error adding comment to ticket {}", ticket.getKey(), error)
+                            v -> logger.info("Added LLM analysis comment to ticket {}", ticket.getKey()),
+                            error -> logger.error("Failed to add LLM analysis comment to ticket {}", ticket.getKey(), error)
                     );
             
             aiAgentService.processJiraTicket(ticket)

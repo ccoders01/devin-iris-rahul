@@ -2,6 +2,7 @@ package com.facility.management.presentation.controller;
 
 import com.facility.management.application.service.JiraMonitoringService;
 import com.facility.management.application.service.SeleniumTestAgent;
+import com.facility.management.application.service.LLMService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,11 +15,13 @@ public class AgentController {
     
     private final JiraMonitoringService jiraMonitoringService;
     private final SeleniumTestAgent seleniumTestAgent;
+    private final LLMService llmService;
     
     @Autowired
-    public AgentController(JiraMonitoringService jiraMonitoringService, SeleniumTestAgent seleniumTestAgent) {
+    public AgentController(JiraMonitoringService jiraMonitoringService, SeleniumTestAgent seleniumTestAgent, LLMService llmService) {
         this.jiraMonitoringService = jiraMonitoringService;
         this.seleniumTestAgent = seleniumTestAgent;
+        this.llmService = llmService;
     }
     
     @GetMapping("/status")
@@ -31,7 +34,8 @@ public class AgentController {
             "processedTickets", jiraMonitoringService.getProcessedTickets(),
             "testAgentProcessedCount", seleniumTestAgent.getProcessedTestTicketsCount(),
             "testAgentProcessedTickets", seleniumTestAgent.getProcessedTestTickets(),
-            "description", "AI Agents monitoring JIRA for facility management and test generation"
+            "llmConfigured", llmService.isConfigured(),
+            "description", "AI Agents monitoring JIRA with LLM-powered analysis for facility management and test generation"
         );
         return ResponseEntity.ok(status);
     }
@@ -53,5 +57,16 @@ public class AgentController {
     public ResponseEntity<Map<String, String>> triggerTestGeneration() {
         seleniumTestAgent.monitorJiraForTestGeneration();
         return ResponseEntity.ok(Map.of("message", "Selenium test generation triggered successfully"));
+    }
+    
+    @PostMapping("/process-ticket/{ticketKey}")
+    public ResponseEntity<Map<String, String>> processSpecificTicket(@PathVariable String ticketKey) {
+        try {
+            jiraMonitoringService.monitorJiraTickets();
+            seleniumTestAgent.monitorJiraForTestGeneration();
+            return ResponseEntity.ok(Map.of("message", "Processing triggered for ticket: " + ticketKey));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("message", "Error processing ticket " + ticketKey + ": " + e.getMessage()));
+        }
     }
 }

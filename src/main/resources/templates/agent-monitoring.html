@@ -354,10 +354,18 @@
                     document.getElementById('processedCount').textContent = data.processedTicketsCount || 0;
                     document.getElementById('testProcessedCount').textContent = data.testAgentProcessedCount || 0;
                     
+                    const llmStatus = data.llmConfigured ? 'Configured' : 'Mock Mode';
+                    const llmBadgeClass = data.llmConfigured ? 'bg-success' : 'bg-warning';
+                    const llmStatusElement = document.getElementById('test-llm-status');
+                    if (llmStatusElement) {
+                        llmStatusElement.textContent = 'LLM: ' + llmStatus;
+                        llmStatusElement.className = 'badge ms-2 ' + llmBadgeClass;
+                    }
+                    
                     const lastCheck = new Date(data.lastCheck);
                     document.getElementById('lastCheck').textContent = lastCheck.toLocaleTimeString();
                     
-                    addToActivityLog('Status check completed', 'info');
+                    addToActivityLog('Status check completed - LLM: ' + llmStatus, 'info');
                 })
                 .catch(error => {
                     console.error('Error fetching agent status:', error);

@@ -126,6 +126,20 @@
             <artifactId>testng</artifactId>
             <version>7.8.0</version>
         </dependency>
+        
+        <!-- OpenAI Java SDK for LLM integration -->
+        <dependency>
+            <groupId>com.theokanning.openai-gpt3-java</groupId>
+            <artifactId>service</artifactId>
+            <version>0.18.2</version>
+        </dependency>
+        
+        <!-- Additional HTTP client for LLM APIs -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
     </dependencies>
 
     <build>

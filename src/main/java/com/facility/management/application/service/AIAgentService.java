@@ -24,18 +24,21 @@ public class AIAgentService {
     private final ContractService contractService;
     private final CodeGenerationService codeGenerationService;
     private final DeploymentService deploymentService;
+    private final LLMService llmService;
     
     @Autowired
     public AIAgentService(FacilityService facilityService, 
                          CustomerService customerService,
                          ContractService contractService,
                          CodeGenerationService codeGenerationService,
-                         DeploymentService deploymentService) {
+                         DeploymentService deploymentService,
+                         LLMService llmService) {
         this.facilityService = facilityService;
         this.customerService = customerService;
         this.contractService = contractService;
         this.codeGenerationService = codeGenerationService;
         this.deploymentService = deploymentService;
+        this.llmService = llmService;
     }
     
     public Mono<ProcessingResult> processJiraTicket(JiraTicket ticket) {
@@ -47,6 +50,12 @@ public class AIAgentService {
             String fullText = summary + " " + (description != null ? description : "");
             
             RequirementAnalysis analysis = analyzeRequirements(fullText);
+            
+            if (llmService.isConfigured()) {
+                String llmAnalysis = llmService.analyzeRequirements(summary, description);
+                logger.info("LLM Analysis for ticket {}: {}", ticket.getKey(), llmAnalysis);
+                enhanceAnalysisWithLLM(analysis, llmAnalysis);
+            }
             
             switch (analysis.getActionType()) {
                 case CREATE_FACILITY:
@@ -383,6 +392,56 @@ public class AIAgentService {
         
         public String getReportType() { return reportType; }
         public void setReportType(String reportType) { this.reportType = reportType; }
+    }
+    
+    private void enhanceAnalysisWithLLM(RequirementAnalysis analysis, String llmAnalysis) {
+        try {
+            String lowerLLM = llmAnalysis.toLowerCase();
+            
+            if (lowerLLM.contains("create_facility") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.CREATE_FACILITY);
+            } else if (lowerLLM.contains("create_customer") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.CREATE_CUSTOMER);
+            } else if (lowerLLM.contains("create_contract") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.CREATE_CONTRACT);
+            } else if (lowerLLM.contains("update_facility") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.UPDATE_FACILITY);
+            } else if (lowerLLM.contains("update_customer") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.UPDATE_CUSTOMER);
+            } else if (lowerLLM.contains("update_contract") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.UPDATE_CONTRACT);
+            } else if (lowerLLM.contains("generate_report") && analysis.getActionType() == ActionType.UNKNOWN) {
+                analysis.setActionType(ActionType.GENERATE_REPORT);
+            }
+            
+            if (analysis.getGfrn() == null && lowerLLM.contains("gfrn")) {
+                String gfrnMatch = extractFromLLMAnalysis(llmAnalysis, "gfrn[:\\s]*([A-Za-z0-9-]+)");
+                if (gfrnMatch != null) analysis.setGfrn(gfrnMatch);
+            }
+            
+            if (analysis.getGfcid() == null && lowerLLM.contains("gfcid")) {
+                String gfcidMatch = extractFromLLMAnalysis(llmAnalysis, "gfcid[:\\s]*([A-Za-z0-9-]+)");
+                if (gfcidMatch != null) analysis.setGfcid(gfcidMatch);
+            }
+            
+            if (analysis.getCagId() == null && lowerLLM.contains("cag")) {
+                String cagMatch = extractFromLLMAnalysis(llmAnalysis, "cag[\\s]*id[:\\s]*([A-Za-z0-9-]+)");
+                if (cagMatch != null) analysis.setCagId(cagMatch);
+            }
+            
+        } catch (Exception e) {
+            logger.warn("Error enhancing analysis with LLM: {}", e.getMessage());
+        }
+    }
+    
+    private String extractFromLLMAnalysis(String text, String pattern) {
+        try {
+            Pattern p = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE);
+            Matcher m = p.matcher(text);
+            return m.find() ? m.group(1).trim() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
     
     public enum ActionType {

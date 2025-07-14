@@ -24,12 +24,14 @@ public class SeleniumTestAgent {
     private static final Logger logger = LoggerFactory.getLogger(SeleniumTestAgent.class);
     
     private final JiraClient jiraClient;
+    private final LLMService llmService;
     private final Set<String> processedTestTickets = new HashSet<>();
     private final String testOutputDirectory = "src/test/java/com/facility/management/selenium/generated";
     
     @Autowired
-    public SeleniumTestAgent(JiraClient jiraClient) {
+    public SeleniumTestAgent(JiraClient jiraClient, LLMService llmService) {
         this.jiraClient = jiraClient;
+        this.llmService = llmService;
         createTestOutputDirectory();
     }
     
@@ -67,7 +69,13 @@ public class SeleniumTestAgent {
             
             processedTestTickets.add(ticket.getKey());
             
-            jiraClient.addComment(ticket.getKey(), "🧪 Selenium Test Agent: Analyzing requirements and generating test cases...")
+            String summary = ticket.getFields().getSummary();
+            String description = ticket.getFields().getDescription();
+            
+            String requirementAnalysis = llmService.analyzeRequirements(summary, description);
+            String acceptanceCriteria = llmService.generateAcceptanceCriteria(summary, description);
+            
+            jiraClient.addComment(ticket.getKey(), "🧪 Selenium Test Agent: Analyzing requirements with LLM and generating test cases...")
                     .subscribe(
                             v -> logger.info("Added test generation comment to ticket {}", ticket.getKey()),
                             error -> logger.error("Error adding test generation comment to ticket {}", ticket.getKey(), error)
@@ -75,22 +83,26 @@ public class SeleniumTestAgent {
             
             RequirementAnalysis requirements = parseRequirements(ticket);
             
-            List<String> acceptanceCriteria = generateAcceptanceCriteria(requirements);
+            List<String> acceptanceCriteriaList = List.of(acceptanceCriteria.split("\n\n"));
             
-            String testCode = generateSeleniumTestCode(ticket, requirements, acceptanceCriteria);
+            String testCode = generateSeleniumTestCode(ticket, requirements, acceptanceCriteriaList);
             
             String fileName = sanitizeFileName(ticket.getKey()) + "Test.java";
             saveTestFile(fileName, testCode);
             
-            String successComment = String.format(
-                "✅ Selenium Test Agent: Successfully generated test cases!\n\n" +
-                "**Acceptance Criteria Generated:**\n%s\n\n" +
-                "**Test File:** %s\n" +
-                "**Test Methods:** %d",
-                acceptanceCriteria.stream().map(criteria -> "• " + criteria).collect(Collectors.joining("\n")),
-                fileName,
-                acceptanceCriteria.size()
-            );
+            String successComment = String.format("""
+                🧪 **Selenium Test Agent - LLM Enhanced**
+                
+                **Requirement Analysis:**
+                %s
+                
+                **Acceptance Criteria Generated:**
+                %s
+                
+                **Test File Created:** %s
+                
+                ✅ Selenium test cases have been generated using LLM analysis and saved.
+                """, requirementAnalysis, acceptanceCriteria, fileName);
             
             jiraClient.addComment(ticket.getKey(), successComment)
                     .subscribe(
@@ -101,7 +113,15 @@ public class SeleniumTestAgent {
         } catch (Exception e) {
             logger.error("Error processing ticket {} for test generation", ticket.getKey(), e);
             
-            jiraClient.addComment(ticket.getKey(), "❌ Selenium Test Agent: Error generating test cases. " + e.getMessage())
+            String errorComment = String.format("""
+                🧪 **Selenium Test Agent - LLM Enhanced**
+                
+                ❌ Failed to generate test cases: %s
+                
+                Please check the system logs for more details.
+                """, e.getMessage());
+            
+            jiraClient.addComment(ticket.getKey(), errorComment)
                     .subscribe();
         }
     }
