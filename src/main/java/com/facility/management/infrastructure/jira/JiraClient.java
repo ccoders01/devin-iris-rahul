@@ -42,7 +42,7 @@ public class JiraClient {
     }
     
     public Mono<JiraSearchResponse> searchRecentTickets(int maxResults) {
-        String jql = "created >= -1d ORDER BY created DESC";
+        String jql = "key = SCRUM-21 OR created >= -7d ORDER BY created DESC";
         
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -53,8 +53,19 @@ public class JiraClient {
                         .build())
                 .retrieve()
                 .bodyToMono(JiraSearchResponse.class)
-                .doOnSuccess(response -> logger.info("Retrieved {} tickets from JIRA", 
-                        response != null ? response.getIssues().size() : 0))
+                .doOnSuccess(response -> {
+                    if (response != null && response.getIssues() != null) {
+                        logger.info("Retrieved {} tickets from JIRA", response.getIssues().size());
+                        response.getIssues().forEach(ticket -> 
+                            logger.debug("Found ticket: {} - {} (created: {})", 
+                                ticket.getKey(), 
+                                ticket.getFields() != null ? ticket.getFields().getSummary() : "No summary",
+                                ticket.getFields() != null ? ticket.getFields().getCreated() : "No date")
+                        );
+                    } else {
+                        logger.info("Retrieved 0 tickets from JIRA");
+                    }
+                })
                 .doOnError(error -> logger.error("Error retrieving tickets from JIRA", error));
     }
     
