@@ -7,6 +7,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.core.io.ByteArrayResource;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -105,6 +107,23 @@ public class JiraClient {
                 .bodyToMono(Void.class)
                 .doOnSuccess(v -> logger.info("Updated status of ticket {}", issueKey))
                 .doOnError(error -> logger.error("Error updating status of ticket {}", issueKey, error));
+    }
+    
+    public Mono<Void> attachFileToTicket(String issueKey, String fileName, byte[] fileContent) {
+        return webClient.post()
+                .uri("/rest/api/3/issue/{issueKey}/attachments", issueKey)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.MULTIPART_FORM_DATA_VALUE)
+                .header("X-Atlassian-Token", "no-check")
+                .body(BodyInserters.fromMultipartData("file", new ByteArrayResource(fileContent) {
+                    @Override
+                    public String getFilename() {
+                        return fileName;
+                    }
+                }))
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(v -> logger.info("Attached file {} to ticket {}", fileName, issueKey))
+                .doOnError(error -> logger.error("Error attaching file {} to ticket {}", fileName, issueKey, error));
     }
     
     public boolean isConfigured() {

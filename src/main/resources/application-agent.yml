@@ -23,6 +23,10 @@ agent:
 
 logging:
   level:
-    com.facility.management.application.service.JiraMonitoringService: INFO
-    com.facility.management.application.service.AIAgentService: INFO
-    com.facility.management.infrastructure.jira: INFO
+    com.facility.management.application.service.JiraMonitoringService: DEBUG
+    com.facility.management.application.service.AIAgentService: DEBUG
+    com.facility.management.application.service.SeleniumTestAgent: DEBUG
+    com.facility.management.application.service.TestExecutionService: DEBUG
+    com.facility.management.infrastructure.jira: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"

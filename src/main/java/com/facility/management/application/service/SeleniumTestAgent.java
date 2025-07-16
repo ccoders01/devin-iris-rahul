@@ -25,13 +25,15 @@ public class SeleniumTestAgent {
     
     private final JiraClient jiraClient;
     private final LLMService llmService;
+    private final TestExecutionService testExecutionService;
     private final Set<String> processedTestTickets = new HashSet<>();
     private final String testOutputDirectory = "src/test/java/com/facility/management/selenium/generated";
     
     @Autowired
-    public SeleniumTestAgent(JiraClient jiraClient, LLMService llmService) {
+    public SeleniumTestAgent(JiraClient jiraClient, LLMService llmService, TestExecutionService testExecutionService) {
         this.jiraClient = jiraClient;
         this.llmService = llmService;
+        this.testExecutionService = testExecutionService;
         createTestOutputDirectory();
     }
     
@@ -90,24 +92,59 @@ public class SeleniumTestAgent {
             String fileName = sanitizeFileName(ticket.getKey()) + "Test.java";
             saveTestFile(fileName, testCode);
             
-            String successComment = String.format("""
-                🧪 **Selenium Test Agent - LLM Enhanced**
-                
-                **Requirement Analysis:**
-                %s
-                
-                **Acceptance Criteria Generated:**
-                %s
-                
-                **Test File Created:** %s
-                
-                ✅ Selenium test cases have been generated using LLM analysis and saved.
-                """, requirementAnalysis, acceptanceCriteria, fileName);
+            try {
+                byte[] testFileContent = testCode.getBytes();
+                jiraClient.attachFileToTicket(ticket.getKey(), fileName, testFileContent)
+                        .subscribe(
+                                v -> logger.info("Successfully attached test file {} to ticket {}", fileName, ticket.getKey()),
+                                error -> logger.error("Failed to attach test file {} to ticket {}", fileName, ticket.getKey(), error)
+                        );
+            } catch (Exception e) {
+                logger.error("Error preparing test file attachment for ticket {}", ticket.getKey(), e);
+            }
             
-            jiraClient.addComment(ticket.getKey(), successComment)
+            String testClassName = "com.facility.management.selenium.generated." + sanitizeClassName(ticket.getKey()) + "Test";
+            TestExecutionService.TestExecutionResult executionResult = testExecutionService.executeSeleniumTests(testClassName);
+            
+            String testResultComment;
+            if (executionResult.isAllPassed()) {
+                testResultComment = String.format("""
+                    🧪 **Selenium Test Agent - Test Execution Results**
+                    
+                    ✅ **All tests passed!**
+                    
+                    **Test Results:**
+                    %s
+                    
+                    **Test File:** %s (attached)
+                    
+                    Tests completed successfully. Ready for deployment.
+                    """, formatTestResults(executionResult.getTestResults()), fileName);
+                
+                jiraClient.updateTicketStatus(ticket.getKey(), "31")
+                        .subscribe(
+                                v -> logger.info("Marked ticket {} as Done after successful test execution", ticket.getKey()),
+                                error -> logger.error("Failed to mark ticket {} as Done", ticket.getKey(), error)
+                        );
+            } else {
+                testResultComment = String.format("""
+                    🧪 **Selenium Test Agent - Test Execution Results**
+                    
+                    ❌ **Some tests failed**
+                    
+                    **Test Results:**
+                    %s
+                    
+                    **Test File:** %s (attached)
+                    
+                    Please review and fix the failing tests before proceeding.
+                    """, formatTestResults(executionResult.getTestResults()), fileName);
+            }
+            
+            jiraClient.addComment(ticket.getKey(), testResultComment)
                     .subscribe(
-                            v -> logger.info("Added test generation success comment to ticket {}", ticket.getKey()),
-                            error -> logger.error("Error adding success comment to ticket {}", ticket.getKey(), error)
+                            v -> logger.info("Added test execution results comment to ticket {}", ticket.getKey()),
+                            error -> logger.error("Error adding test results comment to ticket {}", ticket.getKey(), error)
                     );
             
         } catch (Exception e) {
@@ -263,7 +300,11 @@ public class SeleniumTestAgent {
             
             code.append("    @Test\n");
             code.append("    public void ").append(methodName).append("() {\n");
-            code.append("        // ").append(criteria).append("\n");
+            
+            String[] criteriaLines = criteria.split("\n");
+            for (String line : criteriaLines) {
+                code.append("        // ").append(line.trim()).append("\n");
+            }
             code.append("        \n");
             code.append("        // Navigate to application\n");
             code.append("        driver.get(BASE_URL);\n");
@@ -274,7 +315,11 @@ public class SeleniumTestAgent {
             code.append("        // Verify page is accessible\n");
             code.append("        Assert.assertTrue(driver.getTitle().contains(\"Facility Management\"), \"Application should be accessible\");\n");
             code.append("        \n");
-            code.append("        // TODO: Implement specific test logic for: ").append(criteria).append("\n");
+            code.append("        // TODO: Implement specific test logic for:\n");
+            String[] todoLines = criteria.split("\n");
+            for (String line : todoLines) {
+                code.append("        // ").append(line.trim()).append("\n");
+            }
             code.append("        // Add your test implementation here based on the acceptance criteria\n");
             code.append("        \n");
             code.append("    }\n\n");
@@ -320,6 +365,24 @@ public class SeleniumTestAgent {
     
     public Set<String> getProcessedTestTickets() {
         return new HashSet<>(processedTestTickets);
+    }
+    
+    private String formatTestResults(List<TestExecutionService.TestResult> testResults) {
+        if (testResults.isEmpty()) {
+            return "No test results available";
+        }
+        
+        StringBuilder results = new StringBuilder();
+        for (TestExecutionService.TestResult result : testResults) {
+            String status = result.isPassed() ? "✅ PASSED" : "❌ FAILED";
+            results.append(String.format("- %s: %s (%s)\n", 
+                result.getMethodName(), status, result.getExecutionTime()));
+            if (!result.isPassed() && !result.getErrorMessage().isEmpty()) {
+                results.append("  Error: ").append(result.getErrorMessage().substring(0, 
+                    Math.min(100, result.getErrorMessage().length()))).append("...\n");
+            }
+        }
+        return results.toString();
     }
     
     public static class RequirementAnalysis {

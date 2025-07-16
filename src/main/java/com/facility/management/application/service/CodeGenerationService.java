@@ -3,6 +3,7 @@ package com.facility.management.application.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 import java.math.BigDecimal;
 
@@ -10,8 +11,42 @@ import java.math.BigDecimal;
 public class CodeGenerationService {
     
     private static final Logger logger = LoggerFactory.getLogger(CodeGenerationService.class);
+    private final LLMService llmService;
+    
+    public CodeGenerationService(LLMService llmService) {
+        this.llmService = llmService;
+    }
     
     public String generateFacilityCreationCode(String gfrn, String name, String gfcid, String accountingPeriod, String countryOfRisk) {
+        return generateFacilityCreationCode(gfrn, name, gfcid, accountingPeriod, countryOfRisk, "");
+    }
+    
+    public String generateFacilityCreationCode(String gfrn, String name, String gfcid, String accountingPeriod, String countryOfRisk, String approachDesign) {
+        if (llmService.isConfigured()) {
+            Map<String, String> parameters = Map.of(
+                "gfrn", gfrn,
+                "name", name,
+                "gfcid", gfcid,
+                "accountingPeriod", accountingPeriod,
+                "countryOfRisk", countryOfRisk
+            );
+            
+            String llmCode = llmService.generateImplementationCode(
+                "Create facility: " + name,
+                "Create a new facility with the provided parameters",
+                approachDesign,
+                "CREATE_FACILITY",
+                parameters
+            );
+            
+            logger.info("Generated LLM-powered facility creation code for: {}", name);
+            return llmCode;
+        } else {
+            return generateTemplateFacilityCreationCode(gfrn, name, gfcid, accountingPeriod, countryOfRisk);
+        }
+    }
+    
+    private String generateTemplateFacilityCreationCode(String gfrn, String name, String gfcid, String accountingPeriod, String countryOfRisk) {
         StringBuilder code = new StringBuilder();
         code.append("// Auto-generated facility creation code\n");
         code.append("Facility facility = new Facility(\n");
@@ -23,11 +58,35 @@ public class CodeGenerationService {
         code.append(");\n");
         code.append("facilityService.createFacility(facility);\n");
         
-        logger.info("Generated facility creation code for: {}", name);
+        logger.info("Generated template facility creation code for: {}", name);
         return code.toString();
     }
     
     public String generateCustomerCreationCode(String cagId, String gfcid, String accountingPeriod, String countryOfRisk) {
+        if (llmService.isConfigured()) {
+            Map<String, String> parameters = Map.of(
+                "cagId", cagId,
+                "gfcid", gfcid,
+                "accountingPeriod", accountingPeriod,
+                "countryOfRisk", countryOfRisk
+            );
+            
+            String llmCode = llmService.generateImplementationCode(
+                "Create customer: " + cagId,
+                "Create a new customer with the provided parameters",
+                "",
+                "CREATE_CUSTOMER",
+                parameters
+            );
+            
+            logger.info("Generated LLM-powered customer creation code for: {}", cagId);
+            return llmCode;
+        } else {
+            return generateTemplateCustomerCreationCode(cagId, gfcid, accountingPeriod, countryOfRisk);
+        }
+    }
+    
+    private String generateTemplateCustomerCreationCode(String cagId, String gfcid, String accountingPeriod, String countryOfRisk) {
         StringBuilder code = new StringBuilder();
         code.append("// Auto-generated customer creation code\n");
         code.append("Customer customer = new Customer(\n");
@@ -38,7 +97,48 @@ public class CodeGenerationService {
         code.append(");\n");
         code.append("customerService.createCustomer(customer);\n");
         
-        logger.info("Generated customer creation code for: {}", cagId);
+        logger.info("Generated template customer creation code for: {}", cagId);
+        return code.toString();
+    }
+    
+    public String generateContractCreationCode(String gfrn, String gfcid, String accountingPeriod) {
+        return generateContractCreationCode(gfrn, gfcid, accountingPeriod, "");
+    }
+    
+    public String generateContractCreationCode(String gfrn, String gfcid, String accountingPeriod, String approachDesign) {
+        if (llmService.isConfigured()) {
+            Map<String, String> parameters = Map.of(
+                "gfrn", gfrn,
+                "gfcid", gfcid,
+                "accountingPeriod", accountingPeriod
+            );
+            
+            String llmCode = llmService.generateImplementationCode(
+                "Create contract for GFRN: " + gfrn + ", GFCID: " + gfcid,
+                "Create a new contract with the provided parameters",
+                approachDesign,
+                "CREATE_CONTRACT",
+                parameters
+            );
+            
+            logger.info("Generated LLM-powered contract creation code for GFRN: {}, GFCID: {}", gfrn, gfcid);
+            return llmCode;
+        } else {
+            return generateTemplateContractCreationCode(gfrn, gfcid, accountingPeriod);
+        }
+    }
+    
+    private String generateTemplateContractCreationCode(String gfrn, String gfcid, String accountingPeriod) {
+        StringBuilder code = new StringBuilder();
+        code.append("// Auto-generated contract creation code\n");
+        code.append("Contract contract = new Contract(\n");
+        code.append("    \"").append(gfrn).append("\",\n");
+        code.append("    \"").append(gfcid).append("\",\n");
+        code.append("    \"").append(accountingPeriod).append("\"\n");
+        code.append(");\n");
+        code.append("contractService.createContract(contract);\n");
+        
+        logger.info("Generated template contract creation code for GFRN: {}, GFCID: {}", gfrn, gfcid);
         return code.toString();
     }
     

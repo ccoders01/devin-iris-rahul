@@ -2,6 +2,7 @@ package com.facility.management.application.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.math.BigDecimal;
 
@@ -13,7 +14,9 @@ class CodeGenerationServiceTest {
 
     @BeforeEach
     void setUp() {
-        codeGenerationService = new CodeGenerationService();
+        LLMService mockLLMService = Mockito.mock(LLMService.class);
+        Mockito.when(mockLLMService.isConfigured()).thenReturn(false);
+        codeGenerationService = new CodeGenerationService(mockLLMService);
     }
 
     @Test

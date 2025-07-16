@@ -8,6 +8,11 @@ import org.springframework.stereotype.Service;
 public class DeploymentService {
     
     private static final Logger logger = LoggerFactory.getLogger(DeploymentService.class);
+    private final TestExecutionService testExecutionService;
+    
+    public DeploymentService(TestExecutionService testExecutionService) {
+        this.testExecutionService = testExecutionService;
+    }
     
     public boolean deployChanges(String generatedCode, String description) {
         logger.info("Deploying changes: {}", description);
@@ -61,11 +66,16 @@ public class DeploymentService {
         logger.info("Running automated tests");
         
         try {
-            Thread.sleep(1000);
+            TestExecutionService.TestExecutionResult testResult = testExecutionService.executeSeleniumTests("**/*Test");
+            if (!testResult.isAllPassed()) {
+                logger.error("Tests failed during deployment");
+                return false;
+            }
+            
             logger.info("All tests passed");
             return true;
-        } catch (InterruptedException e) {
-            logger.error("Test execution interrupted", e);
+        } catch (Exception e) {
+            logger.error("Test execution failed", e);
             return false;
         }
     }

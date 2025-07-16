@@ -43,7 +43,8 @@ public class AIAgentService {
     
     public Mono<ProcessingResult> processJiraTicket(JiraTicket ticket) {
         return Mono.fromCallable(() -> {
-            logger.info("AI Agent processing ticket: {}", ticket.getKey());
+            String correlationId = "TICKET-" + ticket.getKey() + "-" + System.currentTimeMillis();
+            logger.info("[{}] AI Agent processing ticket: {}", correlationId, ticket.getKey());
             
             String summary = ticket.getFields().getSummary();
             String description = ticket.getFields().getDescription();
@@ -51,28 +52,38 @@ public class AIAgentService {
             
             RequirementAnalysis analysis = analyzeRequirements(fullText);
             
+            String requirementAnalysis = "";
+            String impactAnalysis = "";
+            String approachDesign = "";
+            
             if (llmService.isConfigured()) {
-                String llmAnalysis = llmService.analyzeRequirements(summary, description);
-                logger.info("LLM Analysis for ticket {}: {}", ticket.getKey(), llmAnalysis);
-                enhanceAnalysisWithLLM(analysis, llmAnalysis);
+                logger.info("[{}] Using LLM for comprehensive analysis", correlationId);
+                requirementAnalysis = llmService.analyzeRequirements(summary, description);
+                impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
+                approachDesign = llmService.generateApproachDesign(summary, description, requirementAnalysis, impactAnalysis);
+                
+                logger.info("[{}] LLM Analysis completed - Requirement: {}, Impact: {}, Approach: {}", 
+                    correlationId, requirementAnalysis.length(), impactAnalysis.length(), approachDesign.length());
+                enhanceAnalysisWithLLM(analysis, requirementAnalysis);
             }
             
             switch (analysis.getActionType()) {
                 case CREATE_FACILITY:
-                    return handleCreateFacility(analysis);
+                    return handleCreateFacility(analysis, approachDesign, correlationId);
                 case CREATE_CUSTOMER:
-                    return handleCreateCustomer(analysis);
+                    return handleCreateCustomer(analysis, approachDesign, correlationId);
                 case CREATE_CONTRACT:
-                    return handleCreateContract(analysis);
+                    return handleCreateContract(analysis, approachDesign, correlationId);
                 case UPDATE_FACILITY:
-                    return handleUpdateFacility(analysis);
+                    return handleUpdateFacility(analysis, approachDesign, correlationId);
                 case UPDATE_CUSTOMER:
-                    return handleUpdateCustomer(analysis);
+                    return handleUpdateCustomer(analysis, approachDesign, correlationId);
                 case UPDATE_CONTRACT:
-                    return handleUpdateContract(analysis);
+                    return handleUpdateContract(analysis, approachDesign, correlationId);
                 case GENERATE_REPORT:
-                    return handleGenerateReport(analysis);
+                    return handleGenerateReport(analysis, approachDesign, correlationId);
                 default:
+                    logger.warn("[{}] Unable to determine action from ticket requirements", correlationId);
                     return new ProcessingResult(false, "Unable to determine action from ticket requirements");
             }
         });
@@ -154,8 +165,9 @@ public class AIAgentService {
         }
     }
     
-    private ProcessingResult handleCreateFacility(RequirementAnalysis analysis) {
+    private ProcessingResult handleCreateFacility(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling facility creation for: {}", correlationId, analysis.getName());
             String gfrn = analysis.getGfrn() != null ? analysis.getGfrn() : "AUTO-" + System.currentTimeMillis();
             String name = analysis.getName() != null ? analysis.getName() : "New Facility";
             String gfcid = analysis.getGfcid() != null ? analysis.getGfcid() : "AUTO-GFCID";
@@ -165,24 +177,28 @@ public class AIAgentService {
             Facility facility = new Facility(gfrn, accountingPeriod, name, gfcid, countryOfRisk);
             facilityService.createFacility(facility);
             
-            String code = codeGenerationService.generateFacilityCreationCode(gfrn, name, gfcid, accountingPeriod, countryOfRisk);
+            String code = codeGenerationService.generateFacilityCreationCode(gfrn, name, gfcid, accountingPeriod, countryOfRisk, approachDesign);
             logger.info("Generated code for facility creation: {}", code);
             
             boolean deployed = deploymentService.deployChanges(code, "Create facility: " + name);
             
+            logger.info("[{}] Facility creation deployment result: {}", correlationId, deployed);
             return new ProcessingResult(deployed, "Successfully created facility: " + name + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error creating facility", e);
+            logger.error("[{}] Error creating facility", correlationId, e);
             return new ProcessingResult(false, "Error creating facility: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleCreateCustomer(RequirementAnalysis analysis) {
+    private ProcessingResult handleCreateCustomer(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
-            String cagId = analysis.getCagId() != null ? analysis.getCagId() : "AUTO-CAG-" + System.currentTimeMillis();
+            logger.info("[{}] Handling customer creation for: {}", correlationId, analysis.getName());
             String gfcid = analysis.getGfcid() != null ? analysis.getGfcid() : "AUTO-GFCID";
-            String accountingPeriod = analysis.getAccountingPeriod() != null ? analysis.getAccountingPeriod() : "2024";
+            String name = analysis.getName() != null ? analysis.getName() : "New Customer";
             String countryOfRisk = analysis.getCountryOfRisk() != null ? analysis.getCountryOfRisk() : "US";
+            
+            String cagId = analysis.getCagId() != null ? analysis.getCagId() : "AUTO-CAG-" + System.currentTimeMillis();
+            String accountingPeriod = analysis.getAccountingPeriod() != null ? analysis.getAccountingPeriod() : "2024";
             
             Customer customer = new Customer(cagId, gfcid, accountingPeriod, countryOfRisk);
             customerService.createCustomer(customer);
@@ -190,17 +206,19 @@ public class AIAgentService {
             String code = codeGenerationService.generateCustomerCreationCode(cagId, gfcid, accountingPeriod, countryOfRisk);
             logger.info("Generated code for customer creation: {}", code);
             
-            boolean deployed = deploymentService.deployChanges(code, "Create customer: " + cagId);
+            boolean deployed = deploymentService.deployChanges(code, "Create customer: " + name);
             
-            return new ProcessingResult(deployed, "Successfully created customer: " + cagId + (deployed ? " and deployed" : ""));
+            logger.info("[{}] Customer creation deployment result: {}", correlationId, deployed);
+            return new ProcessingResult(deployed, "Successfully created customer: " + name + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error creating customer", e);
+            logger.error("[{}] Error creating customer", correlationId, e);
             return new ProcessingResult(false, "Error creating customer: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleCreateContract(RequirementAnalysis analysis) {
+    private ProcessingResult handleCreateContract(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling contract creation for GFRN: {}, GFCID: {}", correlationId, analysis.getGfrn(), analysis.getGfcid());
             String transactionId = analysis.getTransactionId() != null ? analysis.getTransactionId() : "AUTO-TXN-" + System.currentTimeMillis();
             String gfrn = analysis.getGfrn();
             String gfcid = analysis.getGfcid();
@@ -228,15 +246,17 @@ public class AIAgentService {
             
             boolean deployed = deploymentService.deployChanges(code, "Create contract: " + transactionId);
             
+            logger.info("[{}] Contract creation deployment result: {}", correlationId, deployed);
             return new ProcessingResult(deployed, "Successfully created contract: " + transactionId + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error creating contract", e);
+            logger.error("[{}] Error creating contract", correlationId, e);
             return new ProcessingResult(false, "Error creating contract: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleUpdateFacility(RequirementAnalysis analysis) {
+    private ProcessingResult handleUpdateFacility(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling facility update for: {}", correlationId, analysis.getName());
             Long facilityId = analysis.getFacilityId();
             if (facilityId == null) {
                 return new ProcessingResult(false, "Facility ID is required for update");
@@ -258,13 +278,14 @@ public class AIAgentService {
             
             return new ProcessingResult(deployed, "Successfully updated facility: " + facilityId + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error updating facility", e);
+            logger.error("[{}] Error updating facility", correlationId, e);
             return new ProcessingResult(false, "Error updating facility: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleUpdateCustomer(RequirementAnalysis analysis) {
+    private ProcessingResult handleUpdateCustomer(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling customer update for: {}", correlationId, analysis.getName());
             Long customerId = analysis.getCustomerId();
             if (customerId == null) {
                 return new ProcessingResult(false, "Customer ID is required for update");
@@ -286,13 +307,14 @@ public class AIAgentService {
             
             return new ProcessingResult(deployed, "Successfully updated customer: " + customerId + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error updating customer", e);
+            logger.error("[{}] Error updating customer", correlationId, e);
             return new ProcessingResult(false, "Error updating customer: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleUpdateContract(RequirementAnalysis analysis) {
+    private ProcessingResult handleUpdateContract(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling contract update for GFRN: {}", correlationId, analysis.getGfrn());
             Long contractId = analysis.getContractId();
             if (contractId == null) {
                 return new ProcessingResult(false, "Contract ID is required for update");
@@ -314,13 +336,14 @@ public class AIAgentService {
             
             return new ProcessingResult(deployed, "Successfully updated contract: " + contractId + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error updating contract", e);
+            logger.error("[{}] Error updating contract", correlationId, e);
             return new ProcessingResult(false, "Error updating contract: " + e.getMessage());
         }
     }
     
-    private ProcessingResult handleGenerateReport(RequirementAnalysis analysis) {
+    private ProcessingResult handleGenerateReport(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
+            logger.info("[{}] Handling report generation", correlationId);
             String reportType = analysis.getReportType() != null ? analysis.getReportType() : "summary";
             
             String code = codeGenerationService.generateReportCode(reportType);
@@ -330,7 +353,7 @@ public class AIAgentService {
             
             return new ProcessingResult(deployed, "Successfully generated " + reportType + " report" + (deployed ? " and deployed" : ""));
         } catch (Exception e) {
-            logger.error("Error generating report", e);
+            logger.error("[{}] Error generating report", correlationId, e);
             return new ProcessingResult(false, "Error generating report: " + e.getMessage());
         }
     }
