@@ -25,6 +25,7 @@ public class AIAgentService {
     private final CodeGenerationService codeGenerationService;
     private final DeploymentService deploymentService;
     private final LLMService llmService;
+    private final JUnitTestGenerationService junitTestGenerationService;
     
     @Autowired
     public AIAgentService(FacilityService facilityService, 
@@ -32,59 +33,68 @@ public class AIAgentService {
                          ContractService contractService,
                          CodeGenerationService codeGenerationService,
                          DeploymentService deploymentService,
-                         LLMService llmService) {
+                         LLMService llmService,
+                         JUnitTestGenerationService junitTestGenerationService) {
         this.facilityService = facilityService;
         this.customerService = customerService;
         this.contractService = contractService;
         this.codeGenerationService = codeGenerationService;
         this.deploymentService = deploymentService;
         this.llmService = llmService;
+        this.junitTestGenerationService = junitTestGenerationService;
     }
     
     public Mono<ProcessingResult> processJiraTicket(JiraTicket ticket) {
         return Mono.fromCallable(() -> {
-            String correlationId = "TICKET-" + ticket.getKey() + "-" + System.currentTimeMillis();
-            logger.info("[{}] AI Agent processing ticket: {}", correlationId, ticket.getKey());
-            
-            String summary = ticket.getFields().getSummary();
-            String description = ticket.getFields().getDescription();
-            String fullText = summary + " " + (description != null ? description : "");
-            
-            RequirementAnalysis analysis = analyzeRequirements(fullText);
-            
-            String requirementAnalysis = "";
-            String impactAnalysis = "";
-            String approachDesign = "";
-            
-            if (llmService.isConfigured()) {
-                logger.info("[{}] Using LLM for comprehensive analysis", correlationId);
-                requirementAnalysis = llmService.analyzeRequirements(summary, description);
-                impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
-                approachDesign = llmService.generateApproachDesign(summary, description, requirementAnalysis, impactAnalysis);
+            try {
+                String correlationId = "AGENT1-" + ticket.getKey() + "-" + System.currentTimeMillis();
+                logger.info("[{}] Development Agent (Agent 1) - Processing JIRA ticket: {}", correlationId, ticket.getKey());
                 
-                logger.info("[{}] LLM Analysis completed - Requirement: {}, Impact: {}, Approach: {}", 
-                    correlationId, requirementAnalysis.length(), impactAnalysis.length(), approachDesign.length());
-                enhanceAnalysisWithLLM(analysis, requirementAnalysis);
-            }
-            
-            switch (analysis.getActionType()) {
-                case CREATE_FACILITY:
-                    return handleCreateFacility(analysis, approachDesign, correlationId);
-                case CREATE_CUSTOMER:
-                    return handleCreateCustomer(analysis, approachDesign, correlationId);
-                case CREATE_CONTRACT:
-                    return handleCreateContract(analysis, approachDesign, correlationId);
-                case UPDATE_FACILITY:
-                    return handleUpdateFacility(analysis, approachDesign, correlationId);
-                case UPDATE_CUSTOMER:
-                    return handleUpdateCustomer(analysis, approachDesign, correlationId);
-                case UPDATE_CONTRACT:
-                    return handleUpdateContract(analysis, approachDesign, correlationId);
-                case GENERATE_REPORT:
-                    return handleGenerateReport(analysis, approachDesign, correlationId);
-                default:
-                    logger.warn("[{}] Unable to determine action from ticket requirements", correlationId);
-                    return new ProcessingResult(false, "Unable to determine action from ticket requirements");
+                String summary = ticket.getFields().getSummary();
+                String description = ticket.getFields().getDescription();
+                String fullText = summary + " " + (description != null ? description : "");
+                
+                RequirementAnalysis analysis = analyzeRequirements(fullText);
+                
+                String requirementAnalysis = "";
+                String impactAnalysis = "";
+                String approachDesign = "";
+                
+                if (llmService.isConfigured()) {
+                    logger.info("[{}] Using LLM for comprehensive analysis", correlationId);
+                    requirementAnalysis = llmService.analyzeRequirements(summary, description);
+                    impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
+                    approachDesign = llmService.generateApproachDesign(summary, description, requirementAnalysis, impactAnalysis);
+                    
+                    logger.info("[{}] LLM Analysis completed - Requirement: {}, Impact: {}, Approach: {}", 
+                        correlationId, requirementAnalysis.length(), impactAnalysis.length(), approachDesign.length());
+                    enhanceAnalysisWithLLM(analysis, requirementAnalysis);
+                }
+                
+                logger.info("[{}] Completed LLM analysis phase", correlationId);
+                
+                switch (analysis.getActionType()) {
+                    case CREATE_FACILITY:
+                        return handleCreateFacility(analysis, approachDesign, correlationId);
+                    case CREATE_CUSTOMER:
+                        return handleCreateCustomer(analysis, approachDesign, correlationId);
+                    case CREATE_CONTRACT:
+                        return handleCreateContract(analysis, approachDesign, correlationId);
+                    case UPDATE_FACILITY:
+                        return handleUpdateFacility(analysis, approachDesign, correlationId);
+                    case UPDATE_CUSTOMER:
+                        return handleUpdateCustomer(analysis, approachDesign, correlationId);
+                    case UPDATE_CONTRACT:
+                        return handleUpdateContract(analysis, approachDesign, correlationId);
+                    case GENERATE_REPORT:
+                        return handleGenerateReport(analysis, approachDesign, correlationId);
+                    default:
+                        logger.warn("[{}] Unable to determine action from ticket requirements", correlationId);
+                        return new ProcessingResult(false, "Unable to determine action from ticket requirements");
+                }
+            } catch (Exception e) {
+                logger.error("Error processing JIRA ticket {}", ticket.getKey(), e);
+                return new ProcessingResult(false, "Processing error: " + e.getMessage());
             }
         });
     }
@@ -167,7 +177,7 @@ public class AIAgentService {
     
     private ProcessingResult handleCreateFacility(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
-            logger.info("[{}] Handling facility creation for: {}", correlationId, analysis.getName());
+            logger.info("[{}] Development Agent (Agent 1) - Handling facility creation for: {}", correlationId, analysis.getName());
             String gfrn = analysis.getGfrn() != null ? analysis.getGfrn() : "AUTO-" + System.currentTimeMillis();
             String name = analysis.getName() != null ? analysis.getName() : "New Facility";
             String gfcid = analysis.getGfcid() != null ? analysis.getGfcid() : "AUTO-GFCID";
@@ -176,14 +186,28 @@ public class AIAgentService {
             
             Facility facility = new Facility(gfrn, accountingPeriod, name, gfcid, countryOfRisk);
             facilityService.createFacility(facility);
+            logger.info("[{}] Created facility entity: {}", correlationId, name);
             
             String code = codeGenerationService.generateFacilityCreationCode(gfrn, name, gfcid, accountingPeriod, countryOfRisk, approachDesign);
-            logger.info("Generated code for facility creation: {}", code);
+            logger.info("[{}] Generated implementation code for facility creation", correlationId);
+            
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Create facility: " + name,
+                "Create facility with GFRN: " + gfrn + " and name: " + name,
+                code,
+                "CREATE_FACILITY"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
             
             boolean deployed = deploymentService.deployChanges(code, "Create facility: " + name);
-            
             logger.info("[{}] Facility creation deployment result: {}", correlationId, deployed);
-            return new ProcessingResult(deployed, "Successfully created facility: " + name + (deployed ? " and deployed" : ""));
+            
+            String result = String.format("Successfully created facility: %s\n- ✅ Entity created\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                name, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error creating facility", correlationId, e);
             return new ProcessingResult(false, "Error creating facility: " + e.getMessage());
@@ -192,7 +216,7 @@ public class AIAgentService {
     
     private ProcessingResult handleCreateCustomer(RequirementAnalysis analysis, String approachDesign, String correlationId) {
         try {
-            logger.info("[{}] Handling customer creation for: {}", correlationId, analysis.getName());
+            logger.info("[{}] Development Agent (Agent 1) - Handling customer creation for: {}", correlationId, analysis.getName());
             String gfcid = analysis.getGfcid() != null ? analysis.getGfcid() : "AUTO-GFCID";
             String name = analysis.getName() != null ? analysis.getName() : "New Customer";
             String countryOfRisk = analysis.getCountryOfRisk() != null ? analysis.getCountryOfRisk() : "US";
@@ -202,14 +226,28 @@ public class AIAgentService {
             
             Customer customer = new Customer(cagId, gfcid, accountingPeriod, countryOfRisk);
             customerService.createCustomer(customer);
+            logger.info("[{}] Created customer entity: {}", correlationId, name);
             
             String code = codeGenerationService.generateCustomerCreationCode(cagId, gfcid, accountingPeriod, countryOfRisk);
-            logger.info("Generated code for customer creation: {}", code);
+            logger.info("[{}] Generated implementation code for customer creation", correlationId);
+            
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Create customer: " + name,
+                "Create customer with CAG ID: " + cagId + " and GFCID: " + gfcid,
+                code,
+                "CREATE_CUSTOMER"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
             
             boolean deployed = deploymentService.deployChanges(code, "Create customer: " + name);
-            
             logger.info("[{}] Customer creation deployment result: {}", correlationId, deployed);
-            return new ProcessingResult(deployed, "Successfully created customer: " + name + (deployed ? " and deployed" : ""));
+            
+            String result = String.format("Successfully created customer: %s\n- ✅ Entity created\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                name, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error creating customer", correlationId, e);
             return new ProcessingResult(false, "Error creating customer: " + e.getMessage());
@@ -242,12 +280,25 @@ public class AIAgentService {
             contractService.createContract(contract);
             
             String code = codeGenerationService.generateContractCreationCode(transactionId, gfrn, gfcid, directAmount, contingentAmount, accountingPeriod);
-            logger.info("Generated code for contract creation: {}", code);
+            logger.info("[{}] Generated implementation code for contract creation", correlationId);
+            
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Create contract: " + transactionId,
+                "Create contract with GFRN: " + gfrn + " and GFCID: " + gfcid,
+                code,
+                "CREATE_CONTRACT"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
             
             boolean deployed = deploymentService.deployChanges(code, "Create contract: " + transactionId);
-            
             logger.info("[{}] Contract creation deployment result: {}", correlationId, deployed);
-            return new ProcessingResult(deployed, "Successfully created contract: " + transactionId + (deployed ? " and deployed" : ""));
+            
+            String result = String.format("Successfully created contract: %s\n- ✅ Entity created\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                transactionId, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error creating contract", correlationId, e);
             return new ProcessingResult(false, "Error creating contract: " + e.getMessage());
@@ -274,9 +325,25 @@ public class AIAgentService {
             facilityService.updateFacility(facilityId, existingFacility);
             
             String code = codeGenerationService.generateFacilityUpdateCode(facilityId, analysis.getGfrn());
-            boolean deployed = deploymentService.deployChanges(code, "Update facility: " + facilityId);
+            logger.info("[{}] Generated implementation code for facility update", correlationId);
             
-            return new ProcessingResult(deployed, "Successfully updated facility: " + facilityId + (deployed ? " and deployed" : ""));
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Update facility: " + facilityId,
+                "Update facility with ID: " + facilityId + " and GFRN: " + analysis.getGfrn(),
+                code,
+                "UPDATE_FACILITY"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
+            
+            boolean deployed = deploymentService.deployChanges(code, "Update facility: " + facilityId);
+            logger.info("[{}] Facility update deployment result: {}", correlationId, deployed);
+            
+            String result = String.format("Successfully updated facility: %s\n- ✅ Entity updated\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                facilityId, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error updating facility", correlationId, e);
             return new ProcessingResult(false, "Error updating facility: " + e.getMessage());
@@ -303,9 +370,25 @@ public class AIAgentService {
             customerService.updateCustomer(customerId, existingCustomer);
             
             String code = codeGenerationService.generateCustomerUpdateCode(customerId, analysis.getCagId());
-            boolean deployed = deploymentService.deployChanges(code, "Update customer: " + customerId);
+            logger.info("[{}] Generated implementation code for customer update", correlationId);
             
-            return new ProcessingResult(deployed, "Successfully updated customer: " + customerId + (deployed ? " and deployed" : ""));
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Update customer: " + customerId,
+                "Update customer with ID: " + customerId + " and CAG ID: " + analysis.getCagId(),
+                code,
+                "UPDATE_CUSTOMER"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
+            
+            boolean deployed = deploymentService.deployChanges(code, "Update customer: " + customerId);
+            logger.info("[{}] Customer update deployment result: {}", correlationId, deployed);
+            
+            String result = String.format("Successfully updated customer: %s\n- ✅ Entity updated\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                customerId, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error updating customer", correlationId, e);
             return new ProcessingResult(false, "Error updating customer: " + e.getMessage());
@@ -332,9 +415,25 @@ public class AIAgentService {
             contractService.updateContract(contractId, existingContract);
             
             String code = codeGenerationService.generateContractUpdateCode(contractId, analysis.getTransactionId());
-            boolean deployed = deploymentService.deployChanges(code, "Update contract: " + contractId);
+            logger.info("[{}] Generated implementation code for contract update", correlationId);
             
-            return new ProcessingResult(deployed, "Successfully updated contract: " + contractId + (deployed ? " and deployed" : ""));
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Update contract: " + contractId,
+                "Update contract with ID: " + contractId + " and transaction ID: " + analysis.getTransactionId(),
+                code,
+                "UPDATE_CONTRACT"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
+            
+            boolean deployed = deploymentService.deployChanges(code, "Update contract: " + contractId);
+            logger.info("[{}] Contract update deployment result: {}", correlationId, deployed);
+            
+            String result = String.format("Successfully updated contract: %s\n- ✅ Entity updated\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                contractId, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error updating contract", correlationId, e);
             return new ProcessingResult(false, "Error updating contract: " + e.getMessage());
@@ -347,11 +446,25 @@ public class AIAgentService {
             String reportType = analysis.getReportType() != null ? analysis.getReportType() : "summary";
             
             String code = codeGenerationService.generateReportCode(reportType);
-            logger.info("Generated code for report generation: {}", code);
+            logger.info("[{}] Generated implementation code for report generation", correlationId);
+            
+            String ticketKey = correlationId.split("-")[1];
+            String junitTestFile = junitTestGenerationService.generateJUnitTests(
+                ticketKey,
+                "Generate report: " + reportType,
+                "Generate " + reportType + " report for facility management system",
+                code,
+                "GENERATE_REPORT"
+            );
+            logger.info("[{}] Generated JUnit test file: {}", correlationId, junitTestFile);
             
             boolean deployed = deploymentService.deployChanges(code, "Generate report: " + reportType);
+            logger.info("[{}] Report generation deployment result: {}", correlationId, deployed);
             
-            return new ProcessingResult(deployed, "Successfully generated " + reportType + " report" + (deployed ? " and deployed" : ""));
+            String result = String.format("Successfully generated %s report\n- ✅ Code generated\n- ✅ JUnit tests: %s\n- %s Deployment", 
+                reportType, junitTestFile, deployed ? "✅" : "❌");
+            
+            return new ProcessingResult(deployed, result);
         } catch (Exception e) {
             logger.error("[{}] Error generating report", correlationId, e);
             return new ProcessingResult(false, "Error generating report: " + e.getMessage());

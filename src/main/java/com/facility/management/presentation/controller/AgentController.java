@@ -55,7 +55,7 @@ public class AgentController {
     
     @PostMapping("/trigger-test-generation")
     public ResponseEntity<Map<String, String>> triggerTestGeneration() {
-        seleniumTestAgent.monitorJiraForTestGeneration();
+        seleniumTestAgent.monitorForTestGeneration();
         return ResponseEntity.ok(Map.of("message", "Selenium test generation triggered successfully"));
     }
     
@@ -63,7 +63,7 @@ public class AgentController {
     public ResponseEntity<Map<String, String>> processSpecificTicket(@PathVariable String ticketKey) {
         try {
             jiraMonitoringService.monitorJiraTickets();
-            seleniumTestAgent.monitorJiraForTestGeneration();
+            seleniumTestAgent.monitorForTestGeneration();
             return ResponseEntity.ok(Map.of("message", "Processing triggered for ticket: " + ticketKey));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("message", "Error processing ticket " + ticketKey + ": " + e.getMessage()));

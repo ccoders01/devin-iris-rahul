@@ -26,6 +26,7 @@ logging:
     com.facility.management.application.service.JiraMonitoringService: DEBUG
     com.facility.management.application.service.AIAgentService: DEBUG
     com.facility.management.application.service.SeleniumTestAgent: DEBUG
+    com.facility.management.application.service.JUnitTestGenerationService: DEBUG
     com.facility.management.application.service.TestExecutionService: DEBUG
     com.facility.management.infrastructure.jira: DEBUG
   pattern:

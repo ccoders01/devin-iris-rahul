@@ -61,94 +61,109 @@ public class JiraMonitoringService {
     
     private void processTicket(JiraTicket ticket) {
         try {
-            logger.info("Processing JIRA ticket: {}", ticket.getKey());
+            String correlationId = "WORKFLOW-" + ticket.getKey() + "-" + System.currentTimeMillis();
+            logger.info("[{}] Starting two-agent workflow for JIRA ticket: {}", correlationId, ticket.getKey());
             
             processedTickets.add(ticket.getKey());
             
             jiraClient.updateTicketStatus(ticket.getKey(), "21")
                     .subscribe(
-                            v -> logger.info("Transitioned ticket {} to In Progress", ticket.getKey()),
-                            error -> logger.warn("Could not transition ticket {} to In Progress: {}", ticket.getKey(), error.getMessage())
+                            v -> logger.info("[{}] Transitioned ticket {} to In Progress", correlationId, ticket.getKey()),
+                            error -> logger.warn("[{}] Could not transition ticket {} to In Progress: {}", correlationId, ticket.getKey(), error.getMessage())
                     );
             
-            String summary = ticket.getFields().getSummary();
-            String description = ticket.getFields().getDescription();
-            
-            String requirementAnalysis = llmService.analyzeRequirements(summary, description);
-            String impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
-            
-            String analysisComment = String.format("""
-                🤖 **AI Analysis**
-                
-                **Requirement Analysis:**
-                %s
-                
-                **Impact Analysis:**
-                %s
-                
-                Processing implementation...
-                """, requirementAnalysis, impactAnalysis);
-            
-            jiraClient.addComment(ticket.getKey(), analysisComment)
-                    .subscribe(
-                            v -> logger.info("Added LLM analysis comment to ticket {}", ticket.getKey()),
-                            error -> logger.error("Failed to add LLM analysis comment to ticket {}", ticket.getKey(), error)
-                    );
-            
-            aiAgentService.processJiraTicket(ticket)
-                    .subscribe(
-                            result -> {
-                                logger.info("AI processing completed for ticket {}: {}", ticket.getKey(), result.isSuccess());
-                                
-                                String comment;
-                                String transitionId = null;
-                                
-                                if (result.isSuccess()) {
-                                    comment = "✅ AI Agent: Successfully processed and implemented changes. " + result.getMessage();
-                                    transitionId = "31";
-                                } else {
-                                    comment = "❌ AI Agent: Processing failed. " + result.getMessage();
-                                    if (result.getMessage().contains("required") || result.getMessage().contains("not found")) {
-                                        comment += " Please update the ticket with the required information and the agent will retry.";
-                                    } else {
-                                        transitionId = "41";
-                                    }
-                                }
-                                
-                                jiraClient.addComment(ticket.getKey(), comment)
-                                        .subscribe(
-                                                v -> logger.info("Added result comment to ticket {}", ticket.getKey()),
-                                                error -> logger.error("Error adding result comment to ticket {}", ticket.getKey(), error)
-                                        );
-                                
-                                if (transitionId != null) {
-                                    jiraClient.updateTicketStatus(ticket.getKey(), transitionId)
-                                            .subscribe(
-                                                    v -> logger.info("Transitioned ticket {} to final status", ticket.getKey()),
-                                                    error -> logger.warn("Could not transition ticket {} to final status: {}", ticket.getKey(), error.getMessage())
-                                            );
-                                } else {
-                                    logger.info("Keeping ticket {} in In Progress status for user to address validation issues", ticket.getKey());
-                                }
-                            },
-                            error -> {
-                                logger.error("Error processing ticket {} with AI agent", ticket.getKey(), error);
-                                
-                                String errorComment = "❌ AI Agent: Processing error occurred. " + error.getMessage();
-                                jiraClient.addComment(ticket.getKey(), errorComment)
-                                        .subscribe();
-                                
-                                jiraClient.updateTicketStatus(ticket.getKey(), "41")
-                                        .subscribe(
-                                                v -> logger.info("Transitioned ticket {} to failed status due to processing error", ticket.getKey()),
-                                                error2 -> logger.warn("Could not transition ticket {} to failed status: {}", ticket.getKey(), error2.getMessage())
-                                        );
-                            }
-                    );
+            startDevelopmentAgentWorkflow(ticket, correlationId);
             
         } catch (Exception e) {
             logger.error("Error processing ticket {}", ticket.getKey(), e);
         }
+    }
+    
+    private void startDevelopmentAgentWorkflow(JiraTicket ticket, String correlationId) {
+        logger.info("[{}] Starting Development Agent (Agent 1) workflow", correlationId);
+        
+        String summary = ticket.getFields().getSummary();
+        String description = ticket.getFields().getDescription();
+        
+        String requirementAnalysis = llmService.analyzeRequirements(summary, description);
+        String impactAnalysis = llmService.generateImpactAnalysis(summary, description, requirementAnalysis);
+        String approachDesign = llmService.generateApproachDesign(summary, description, requirementAnalysis, impactAnalysis);
+        
+        String analysisComment = String.format("""
+            🤖 **Development Agent (Agent 1) - LLM Analysis**
+            
+            **Requirement Analysis:**
+            %s
+            
+            **Impact Analysis:**
+            %s
+            
+            **Approach Design:**
+            %s
+            
+            Starting code generation and JUnit test creation...
+            """, requirementAnalysis, impactAnalysis, approachDesign);
+        
+        jiraClient.addComment(ticket.getKey(), analysisComment)
+                .subscribe(
+                        v -> logger.info("[{}] Added Development Agent analysis comment to ticket {}", correlationId, ticket.getKey()),
+                        error -> logger.error("[{}] Failed to add analysis comment to ticket {}", correlationId, ticket.getKey(), error)
+                );
+        
+        aiAgentService.processJiraTicket(ticket)
+                .subscribe(
+                        result -> {
+                            logger.info("[{}] Development Agent processing completed for ticket {}: {}", correlationId, ticket.getKey(), result.isSuccess());
+                            
+                            if (result.isSuccess()) {
+                                String devComment = "✅ **Development Agent (Agent 1) - Completed**\n\n" +
+                                                  "- ✅ LLM Impact Analysis\n" +
+                                                  "- ✅ Code Generation\n" +
+                                                  "- ✅ JUnit Test Creation\n" +
+                                                  "- ✅ Deployment\n\n" +
+                                                  result.getMessage() + "\n\n" +
+                                                  "🔄 **Ready for Selenium Testing Agent (Agent 2)**";
+                                
+                                jiraClient.addComment(ticket.getKey(), devComment)
+                                        .subscribe(
+                                                v -> logger.info("[{}] Added Development Agent completion comment - Agent 2 will pick up automatically", correlationId),
+                                                error -> logger.error("[{}] Error adding dev completion comment", correlationId, error)
+                                        );
+                            } else {
+                                String failComment = "❌ **Development Agent (Agent 1) - Failed**\n\n" + result.getMessage();
+                                if (result.getMessage().contains("required") || result.getMessage().contains("not found")) {
+                                    failComment += "\n\nPlease update the ticket with the required information and the agent will retry.";
+                                }
+                                
+                                jiraClient.addComment(ticket.getKey(), failComment)
+                                        .subscribe(
+                                                v -> logger.info("[{}] Added Development Agent failure comment", correlationId),
+                                                error -> logger.error("[{}] Error adding failure comment", correlationId, error)
+                                        );
+                                
+                                if (!result.getMessage().contains("required") && !result.getMessage().contains("not found")) {
+                                    jiraClient.updateTicketStatus(ticket.getKey(), "41")
+                                            .subscribe(
+                                                    v -> logger.info("[{}] Transitioned ticket {} to failed status", correlationId, ticket.getKey()),
+                                                    error -> logger.warn("[{}] Could not transition ticket {} to failed status", correlationId, ticket.getKey())
+                                            );
+                                }
+                            }
+                        },
+                        error -> {
+                            logger.error("[{}] Error in Development Agent processing for ticket {}", correlationId, ticket.getKey(), error);
+                            
+                            String errorComment = "❌ **Development Agent (Agent 1) - Error**\n\nProcessing error occurred: " + error.getMessage();
+                            jiraClient.addComment(ticket.getKey(), errorComment)
+                                    .subscribe();
+                            
+                            jiraClient.updateTicketStatus(ticket.getKey(), "41")
+                                    .subscribe(
+                                            v -> logger.info("[{}] Transitioned ticket {} to failed status due to processing error", correlationId, ticket.getKey()),
+                                            error2 -> logger.warn("[{}] Could not transition ticket {} to failed status", correlationId, ticket.getKey())
+                                    );
+                        }
+                );
     }
     
     public void resetProcessedTickets() {
