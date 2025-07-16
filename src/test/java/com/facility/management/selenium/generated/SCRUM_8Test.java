@@ -15,7 +15,7 @@ import java.time.Duration;
 /**
  * Generated Selenium test for JIRA ticket: SCRUM-8
  * Summary: (Sample) Credit Card Payment
- * Generated on: 2025-07-16T07:06:54.373087429
+ * Generated on: 2025-07-16T10:29:24.998107116
  */
 public class SCRUM_8Test {
 
@@ -58,7 +58,8 @@ public class SCRUM_8Test {
         // Verify page is accessible
         Assert.assertTrue(driver.getTitle().contains("Facility Management"), "Application should be accessible");
         
-        // TODO: Implement specific test logic for: **Mock Acceptance Criteria** (LLM not configured)
+        // TODO: Implement specific test logic for:
+        // **Mock Acceptance Criteria** (LLM not configured)
         // Add your test implementation here based on the acceptance criteria
         
     }
@@ -66,8 +67,8 @@ public class SCRUM_8Test {
     @Test
     public void testAcceptanceCriteria2() {
         // **GIVEN** the system is configured
-**WHEN** user performs the requested action: (Sample) Credit Card Payment
-**THEN** the system should respond appropriately
+        // **WHEN** user performs the requested action: (Sample) Credit Card Payment
+        // **THEN** the system should respond appropriately
         
         // Navigate to application
         driver.get(BASE_URL);
@@ -78,9 +79,10 @@ public class SCRUM_8Test {
         // Verify page is accessible
         Assert.assertTrue(driver.getTitle().contains("Facility Management"), "Application should be accessible");
         
-        // TODO: Implement specific test logic for: **GIVEN** the system is configured
-**WHEN** user performs the requested action: (Sample) Credit Card Payment
-**THEN** the system should respond appropriately
+        // TODO: Implement specific test logic for:
+        // **GIVEN** the system is configured
+        // **WHEN** user performs the requested action: (Sample) Credit Card Payment
+        // **THEN** the system should respond appropriately
         // Add your test implementation here based on the acceptance criteria
         
     }
@@ -88,8 +90,8 @@ public class SCRUM_8Test {
     @Test
     public void testAcceptanceCriteria3() {
         // **GIVEN** invalid input is provided
-**WHEN** user attempts the operation
-**THEN** appropriate error messages should be displayed
+        // **WHEN** user attempts the operation
+        // **THEN** appropriate error messages should be displayed
         
         // Navigate to application
         driver.get(BASE_URL);
@@ -100,9 +102,10 @@ public class SCRUM_8Test {
         // Verify page is accessible
         Assert.assertTrue(driver.getTitle().contains("Facility Management"), "Application should be accessible");
         
-        // TODO: Implement specific test logic for: **GIVEN** invalid input is provided
-**WHEN** user attempts the operation
-**THEN** appropriate error messages should be displayed
+        // TODO: Implement specific test logic for:
+        // **GIVEN** invalid input is provided
+        // **WHEN** user attempts the operation
+        // **THEN** appropriate error messages should be displayed
         // Add your test implementation here based on the acceptance criteria
         
     }
@@ -110,7 +113,6 @@ public class SCRUM_8Test {
     @Test
     public void testAcceptanceCriteria4() {
         // *Note: Configure AI_API_KEY environment variable to enable real criteria generation*
-
         
         // Navigate to application
         driver.get(BASE_URL);
@@ -121,8 +123,8 @@ public class SCRUM_8Test {
         // Verify page is accessible
         Assert.assertTrue(driver.getTitle().contains("Facility Management"), "Application should be accessible");
         
-        // TODO: Implement specific test logic for: *Note: Configure AI_API_KEY environment variable to enable real criteria generation*
-
+        // TODO: Implement specific test logic for:
+        // *Note: Configure AI_API_KEY environment variable to enable real criteria generation*
         // Add your test implementation here based on the acceptance criteria
         
     }

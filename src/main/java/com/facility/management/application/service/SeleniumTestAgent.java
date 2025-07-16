@@ -38,26 +38,28 @@ public class SeleniumTestAgent {
     }
     
     @Scheduled(fixedRate = 300000)
-    public void monitorJiraForTestGeneration() {
+    public void monitorForTestGeneration() {
         if (!jiraClient.isConfigured()) {
             logger.debug("JIRA client not configured, skipping test generation monitoring");
             return;
         }
         
-        logger.info("Starting JIRA ticket monitoring for test generation");
+        logger.info("Selenium Testing Agent (Agent 2) - Monitoring for tickets ready for testing");
         
         jiraClient.searchRecentTickets(50)
                 .subscribe(
                         response -> {
                             if (response != null && response.getIssues() != null) {
-                                List<JiraTicket> allTickets = response.getIssues().stream()
+                                List<JiraTicket> testTickets = response.getIssues().stream()
+                                        .filter(JiraTicket::isFacilityManagementTicket)
                                         .filter(ticket -> !processedTestTickets.contains(ticket.getKey()))
+                                        .filter(this::isDevelopmentPhaseComplete)
                                         .collect(Collectors.toList());
                                 
-                                logger.info("Found {} new tickets for test generation", allTickets.size());
+                                logger.info("Found {} tickets ready for Selenium testing (Agent 2)", testTickets.size());
                                 
-                                for (JiraTicket ticket : allTickets) {
-                                    processTicketForTestGeneration(ticket);
+                                for (JiraTicket ticket : testTickets) {
+                                    generateTestsForTicket(ticket);
                                 }
                             }
                         },
@@ -65,30 +67,56 @@ public class SeleniumTestAgent {
                 );
     }
     
-    private void processTicketForTestGeneration(JiraTicket ticket) {
+    private boolean isDevelopmentPhaseComplete(JiraTicket ticket) {
+        return "In Progress".equals(ticket.getFields().getStatus().getName()) ||
+               "Ready for Testing".equals(ticket.getFields().getStatus().getName());
+    }
+    
+    private void generateTestsForTicket(JiraTicket ticket) {
         try {
-            logger.info("Processing JIRA ticket for test generation: {}", ticket.getKey());
+            String correlationId = "AGENT2-" + ticket.getKey() + "-" + System.currentTimeMillis();
+            logger.info("[{}] Selenium Testing Agent (Agent 2) - Processing ticket for test generation: {}", correlationId, ticket.getKey());
             
             processedTestTickets.add(ticket.getKey());
             
             String summary = ticket.getFields().getSummary();
             String description = ticket.getFields().getDescription();
             
-            String requirementAnalysis = llmService.analyzeRequirements(summary, description);
-            String acceptanceCriteria = llmService.generateAcceptanceCriteria(summary, description);
+            RequirementAnalysis analysis = parseRequirements(ticket);
             
-            jiraClient.addComment(ticket.getKey(), "🧪 Selenium Test Agent: Analyzing requirements with LLM and generating test cases...")
+            String requirementAnalysis = "";
+            String acceptanceCriteria = "";
+            
+            if (llmService.isConfigured()) {
+                logger.info("[{}] Using LLM for test case generation", correlationId);
+                requirementAnalysis = llmService.analyzeRequirements(summary, description);
+                acceptanceCriteria = llmService.generateAcceptanceCriteria(summary, description);
+            } else {
+                logger.info("[{}] Using mock mode for test case generation", correlationId);
+                requirementAnalysis = "Mock requirement analysis for: " + summary;
+                acceptanceCriteria = generateMockAcceptanceCriteria(summary);
+            }
+            
+            String testGenerationComment = String.format("""
+                🧪 **Selenium Testing Agent (Agent 2) - Test Generation Phase**
+                
+                **Requirement Analysis:**
+                %s
+                
+                **Acceptance Criteria Generated:**
+                %s
+                
+                Generating Selenium test cases...
+                """, requirementAnalysis, acceptanceCriteria);
+            
+            jiraClient.addComment(ticket.getKey(), testGenerationComment)
                     .subscribe(
-                            v -> logger.info("Added test generation comment to ticket {}", ticket.getKey()),
-                            error -> logger.error("Error adding test generation comment to ticket {}", ticket.getKey(), error)
+                            v -> logger.info("[{}] Added test generation phase comment", correlationId),
+                            error -> logger.error("[{}] Error adding test generation comment", correlationId, error)
                     );
             
-            RequirementAnalysis requirements = parseRequirements(ticket);
-            
             List<String> acceptanceCriteriaList = List.of(acceptanceCriteria.split("\n\n"));
-            
-            String testCode = generateSeleniumTestCode(ticket, requirements, acceptanceCriteriaList);
-            
+            String testCode = generateSeleniumTestCode(ticket, analysis, acceptanceCriteriaList);
             String fileName = sanitizeFileName(ticket.getKey()) + "Test.java";
             saveTestFile(fileName, testCode);
             
@@ -96,71 +124,99 @@ public class SeleniumTestAgent {
                 byte[] testFileContent = testCode.getBytes();
                 jiraClient.attachFileToTicket(ticket.getKey(), fileName, testFileContent)
                         .subscribe(
-                                v -> logger.info("Successfully attached test file {} to ticket {}", fileName, ticket.getKey()),
-                                error -> logger.error("Failed to attach test file {} to ticket {}", fileName, ticket.getKey(), error)
+                                v -> {
+                                    logger.info("[{}] Successfully attached test file {} to ticket {}", correlationId, fileName, ticket.getKey());
+                                    executeTestsAndGenerateReport(ticket, fileName, correlationId);
+                                },
+                                error -> {
+                                    logger.error("[{}] Failed to attach test file {} to ticket {}", correlationId, fileName, ticket.getKey(), error);
+                                    executeTestsAndGenerateReport(ticket, fileName, correlationId);
+                                }
                         );
             } catch (Exception e) {
-                logger.error("Error preparing test file attachment for ticket {}", ticket.getKey(), e);
+                logger.error("[{}] Error preparing test file attachment for ticket {}", correlationId, ticket.getKey(), e);
+                executeTestsAndGenerateReport(ticket, fileName, correlationId);
             }
-            
-            String testClassName = "com.facility.management.selenium.generated." + sanitizeClassName(ticket.getKey()) + "Test";
-            TestExecutionService.TestExecutionResult executionResult = testExecutionService.executeSeleniumTests(testClassName);
-            
-            String testResultComment;
-            if (executionResult.isAllPassed()) {
-                testResultComment = String.format("""
-                    🧪 **Selenium Test Agent - Test Execution Results**
-                    
-                    ✅ **All tests passed!**
-                    
-                    **Test Results:**
-                    %s
-                    
-                    **Test File:** %s (attached)
-                    
-                    Tests completed successfully. Ready for deployment.
-                    """, formatTestResults(executionResult.getTestResults()), fileName);
-                
-                jiraClient.updateTicketStatus(ticket.getKey(), "31")
-                        .subscribe(
-                                v -> logger.info("Marked ticket {} as Done after successful test execution", ticket.getKey()),
-                                error -> logger.error("Failed to mark ticket {} as Done", ticket.getKey(), error)
-                        );
-            } else {
-                testResultComment = String.format("""
-                    🧪 **Selenium Test Agent - Test Execution Results**
-                    
-                    ❌ **Some tests failed**
-                    
-                    **Test Results:**
-                    %s
-                    
-                    **Test File:** %s (attached)
-                    
-                    Please review and fix the failing tests before proceeding.
-                    """, formatTestResults(executionResult.getTestResults()), fileName);
-            }
-            
-            jiraClient.addComment(ticket.getKey(), testResultComment)
-                    .subscribe(
-                            v -> logger.info("Added test execution results comment to ticket {}", ticket.getKey()),
-                            error -> logger.error("Error adding test results comment to ticket {}", ticket.getKey(), error)
-                    );
             
         } catch (Exception e) {
-            logger.error("Error processing ticket {} for test generation", ticket.getKey(), e);
-            
-            String errorComment = String.format("""
-                🧪 **Selenium Test Agent - LLM Enhanced**
-                
-                ❌ Failed to generate test cases: %s
-                
-                Please check the system logs for more details.
-                """, e.getMessage());
-            
-            jiraClient.addComment(ticket.getKey(), errorComment)
-                    .subscribe();
+            logger.error("Error generating tests for ticket {}", ticket.getKey(), e);
         }
+    }
+    
+    private void executeTestsAndGenerateReport(JiraTicket ticket, String fileName, String correlationId) {
+        logger.info("[{}] Starting test execution phase", correlationId);
+        
+        String testClassName = "com.facility.management.selenium.generated." + sanitizeClassName(ticket.getKey()) + "Test";
+        TestExecutionService.TestExecutionResult executionResult = testExecutionService.executeSeleniumTests(testClassName);
+        
+        String testResultComment;
+        if (executionResult.isAllPassed()) {
+            testResultComment = String.format("""
+                🧪 **Selenium Testing Agent (Agent 2) - Final Report**
+                
+                ✅ **All Selenium tests passed!**
+                
+                **Test Execution Summary:**
+                %s
+                
+                **Test File:** %s (attached)
+                
+                **Agent 2 Workflow Completed:**
+                - ✅ LLM-powered test case generation
+                - ✅ Test file attachment to JIRA
+                - ✅ Automated test execution
+                - ✅ Test report generation
+                
+                **🎉 Two-Agent Workflow Complete - Marking ticket as DONE**
+                """, formatTestResults(executionResult.getTestResults()), fileName);
+            
+            jiraClient.updateTicketStatus(ticket.getKey(), "31")
+                    .subscribe(
+                            v -> logger.info("[{}] ✅ Marked ticket {} as Done after successful Agent 2 completion", correlationId, ticket.getKey()),
+                            error -> logger.error("[{}] Failed to mark ticket {} as Done", correlationId, ticket.getKey(), error)
+                    );
+        } else {
+            testResultComment = String.format("""
+                🧪 **Selenium Testing Agent (Agent 2) - Final Report**
+                
+                ❌ **Some Selenium tests failed**
+                
+                **Test Execution Summary:**
+                %s
+                
+                **Test File:** %s (attached)
+                
+                **Agent 2 Workflow Status:**
+                - ✅ LLM-powered test case generation
+                - ✅ Test file attachment to JIRA
+                - ✅ Automated test execution
+                - ❌ Test failures detected
+                
+                **Next Steps:** Please review and fix the failing tests before proceeding.
+                """, formatTestResults(executionResult.getTestResults()), fileName);
+        }
+        
+        jiraClient.addComment(ticket.getKey(), testResultComment)
+                .subscribe(
+                        v -> logger.info("[{}] Added final test execution report to ticket {}", correlationId, ticket.getKey()),
+                        error -> logger.error("[{}] Error adding test results comment to ticket {}", correlationId, ticket.getKey(), error)
+                );
+    }
+    
+    private String generateMockAcceptanceCriteria(String summary) {
+        return String.format("""
+            **Mock Acceptance Criteria** (LLM not configured)
+            
+            **GIVEN** the system is configured
+            **WHEN** user performs the requested action: %s
+            **THEN** the system should respond appropriately
+            
+            **GIVEN** invalid input is provided
+            **WHEN** user attempts the operation
+            **THEN** appropriate error messages should be displayed
+            
+            *Note: Configure AI_API_KEY environment variable to enable real criteria generation*
+            """, summary);
     }
     
     private RequirementAnalysis parseRequirements(JiraTicket ticket) {

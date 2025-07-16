@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 import java.time.Duration;
 import java.util.List;
@@ -225,5 +226,157 @@ public class LLMService {
             
             *Note: Configure AI_API_KEY environment variable to enable real criteria generation*
             """, summary);
+    }
+    
+    public String generateApproachDesign(String ticketSummary, String ticketDescription, String requirementAnalysis, String impactAnalysis) {
+        if (!isConfigured) {
+            return generateMockApproachDesign(ticketSummary, ticketDescription);
+        }
+        
+        try {
+            String prompt = buildApproachDesignPrompt(ticketSummary, ticketDescription, requirementAnalysis, impactAnalysis);
+            
+            ChatCompletionRequest request = ChatCompletionRequest.builder()
+                    .model(model)
+                    .messages(List.of(
+                            new ChatMessage(ChatMessageRole.SYSTEM.value(), 
+                                "You are a senior software architect specializing in facility management systems. " +
+                                "Design detailed implementation approaches for JIRA requirements, including step-by-step technical plans."),
+                            new ChatMessage(ChatMessageRole.USER.value(), prompt)
+                    ))
+                    .maxTokens(2000)
+                    .temperature(0.2)
+                    .build();
+            
+            ChatCompletionResult result = openAiService.createChatCompletion(request);
+            return result.getChoices().get(0).getMessage().getContent();
+            
+        } catch (Exception e) {
+            logger.error("Error calling LLM for approach design", e);
+            return "Error generating approach design: " + e.getMessage();
+        }
+    }
+    
+    public String generateImplementationCode(String ticketSummary, String ticketDescription, String approachDesign, String actionType, Map<String, String> parameters) {
+        if (!isConfigured) {
+            return generateMockImplementationCode(ticketSummary, actionType);
+        }
+        
+        try {
+            String prompt = buildImplementationCodePrompt(ticketSummary, ticketDescription, approachDesign, actionType, parameters);
+            
+            ChatCompletionRequest request = ChatCompletionRequest.builder()
+                    .model(model)
+                    .messages(List.of(
+                            new ChatMessage(ChatMessageRole.SYSTEM.value(), 
+                                "You are an expert Java developer specializing in Spring Boot facility management systems. " +
+                                "Generate clean, production-ready Java code following existing patterns and best practices."),
+                            new ChatMessage(ChatMessageRole.USER.value(), prompt)
+                    ))
+                    .maxTokens(3000)
+                    .temperature(0.1)
+                    .build();
+            
+            ChatCompletionResult result = openAiService.createChatCompletion(request);
+            return result.getChoices().get(0).getMessage().getContent();
+            
+        } catch (Exception e) {
+            logger.error("Error calling LLM for code generation", e);
+            return "Error generating implementation code: " + e.getMessage();
+        }
+    }
+    
+    private String generateMockApproachDesign(String ticketSummary, String ticketDescription) {
+        return String.format("""
+            Mock Approach Design for: %s
+            
+            Technical Approach:
+            1. Analyze existing system components
+            2. Identify required modifications
+            3. Implement changes following Spring Boot patterns
+            4. Add appropriate error handling
+            5. Update tests and documentation
+            
+            Implementation Steps:
+            - Review current codebase structure
+            - Design database schema changes if needed
+            - Implement service layer modifications
+            - Update controller endpoints
+            - Add validation and error handling
+            - Create or update unit tests
+            """, ticketSummary);
+    }
+    
+    private String generateMockImplementationCode(String ticketSummary, String actionType) {
+        return String.format("""
+            // Action Type: %s
+            
+            @Service
+            public class GeneratedService {
+                
+                private static final Logger logger = LoggerFactory.getLogger(GeneratedService.class);
+                
+                public void executeAction() {
+                    logger.info("Executing mock implementation for: %s");
+                }
+            }
+            """, ticketSummary, actionType, ticketSummary);
+    }
+    
+    private String buildApproachDesignPrompt(String ticketSummary, String ticketDescription, String requirementAnalysis, String impactAnalysis) {
+        return String.format("""
+            Design a technical implementation approach for the following JIRA ticket:
+            
+            Summary: %s
+            Description: %s
+            
+            Requirement Analysis:
+            %s
+            
+            Impact Analysis:
+            %s
+            
+            Please provide a detailed technical approach including:
+            1. Step-by-step implementation plan
+            2. Required system components and modifications
+            3. Database schema changes if needed
+            4. API endpoints or service methods to create/modify
+            5. Error handling considerations
+            6. Testing strategy
+            
+            Focus on Spring Boot and facility management system patterns.
+            """, ticketSummary, ticketDescription != null ? ticketDescription : "No description provided", 
+                requirementAnalysis, impactAnalysis);
+    }
+    
+    private String buildImplementationCodePrompt(String ticketSummary, String ticketDescription, String approachDesign, String actionType, Map<String, String> parameters) {
+        StringBuilder paramStr = new StringBuilder();
+        if (parameters != null && !parameters.isEmpty()) {
+            paramStr.append("Parameters:\n");
+            parameters.forEach((key, value) -> paramStr.append("- ").append(key).append(": ").append(value).append("\n"));
+        }
+        
+        return String.format("""
+            Generate Java implementation code for the following JIRA ticket:
+            
+            Summary: %s
+            Description: %s
+            Action Type: %s
+            
+            %s
+            
+            Technical Approach:
+            %s
+            
+            Please generate clean, production-ready Java code that:
+            1. Follows Spring Boot best practices
+            2. Includes proper error handling
+            3. Uses appropriate logging
+            4. Follows existing code patterns in the facility management system
+            5. Includes necessary imports and annotations
+            
+            Focus on creating service methods, entity operations, or controller endpoints as appropriate.
+            """, ticketSummary, ticketDescription != null ? ticketDescription : "No description provided", 
+                actionType, paramStr.toString(), approachDesign);
     }
 }
